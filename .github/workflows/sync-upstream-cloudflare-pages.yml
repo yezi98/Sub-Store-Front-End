@@ -1,0 +1,72 @@
+name: Sync upstream and deploy Cloudflare Pages
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 每天北京时间 04:20，同步上游并部署 Cloudflare Pages
+    - cron: "20 20 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-cloudflare-pages
+  cancel-in-progress: false
+
+jobs:
+  sync-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync upstream master
+        id: sync
+        run: |
+          set -e
+          git remote add upstream https://github.com/sub-store-org/Sub-Store-Front-End.git || true
+          git fetch upstream master
+          BEFORE="$(git rev-parse HEAD)"
+          git merge --ff-only upstream/master
+          AFTER="$(git rev-parse HEAD)"
+          if [ "$BEFORE" != "$AFTER" ]; then
+            git push origin master
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".node-version"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: |
+          pnpm config set registry https://registry.npmmirror.com
+          pnpm install --no-frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT_NAME }} --branch=master
