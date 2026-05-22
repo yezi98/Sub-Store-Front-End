@@ -37,7 +37,11 @@ jobs:
           git remote add upstream https://github.com/sub-store-org/Sub-Store-Front-End.git || true
           git fetch upstream master
           BEFORE="$(git rev-parse HEAD)"
-          git merge --ff-only upstream/master
+
+          # fork 自己有 workflow/部署配置提交时，不能使用 --ff-only。
+          # 用普通 merge 保留 fork 自己的提交，同时合并上游最新代码；如有真实冲突则失败，避免自动覆盖。
+          git merge --no-edit upstream/master
+
           AFTER="$(git rev-parse HEAD)"
           if [ "$BEFORE" != "$AFTER" ]; then
             git push origin master
