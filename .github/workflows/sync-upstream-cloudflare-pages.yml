@@ -2,8 +2,10 @@ name: Sync upstream and deploy Cloudflare Pages
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [sync-upstream]
   schedule:
-    # 每天北京时间 04:20，同步上游并部署 Cloudflare Pages；GitHub cron 使用 UTC
+    # 每天北京时间 04:20 自动同步（UTC 20:20）
     - cron: "20 20 * * *"
 
 permissions:
@@ -54,32 +56,36 @@ jobs:
           echo "Upstream commit: $(git rev-parse upstream/master)"
           git --no-pager log --oneline -5
 
+      # 只有上游有更新时才执行后续构建和部署
       - name: Set up Node.js
+        if: steps.sync.outputs.changed == 'true'
         uses: actions/setup-node@v4
         with:
           node-version-file: ".node-version"
 
       - name: Set up pnpm
+        if: steps.sync.outputs.changed == 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10
           run_install: false
 
       - name: Install dependencies
+        if: steps.sync.outputs.changed == 'true'
         run: |
           corepack enable || true
           pnpm config set registry https://registry.npmmirror.com
           pnpm install --no-frozen-lockfile
 
       - name: Build
+        if: steps.sync.outputs.changed == 'true'
         env:
-          # 如果你希望前端默认连接自己的后端，在 GitHub Secrets 添加 VITE_API_URL
-          # 例如：https://subapi.example.com/你的后端路径密码
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_PUBLIC_PATH: /
         run: pnpm build
 
       - name: Add Cloudflare Pages cache headers
+        if: steps.sync.outputs.changed == 'true'
         run: |
           cat > dist/_headers <<'EOF'
           /*
@@ -87,9 +93,9 @@ jobs:
           EOF
 
       - name: Deploy to Cloudflare Pages
+        if: steps.sync.outputs.changed == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # 如果 Cloudflare Pages 项目的 Production branch 不是 master，请把这里改成对应分支
           command: pages deploy dist --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT_NAME }} --branch=master
