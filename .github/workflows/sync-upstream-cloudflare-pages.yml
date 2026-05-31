@@ -3,15 +3,10 @@ name: Sync upstream and deploy Cloudflare Pages
 on:
   workflow_dispatch:
   schedule:
-    # 每天北京时间 04:20 执行（GitHub 使用 UTC 时间）
     - cron: "20 20 * * *"
 
 permissions:
   contents: write
-
-concurrency:
-  group: sync-upstream-cloudflare-pages
-  cancel-in-progress: false
 
 jobs:
   sync-and-deploy:
@@ -33,28 +28,30 @@ jobs:
       - name: Sync upstream master
         id: sync
         run: |
-          set -e
           git remote add upstream https://github.com/sub-store-org/Sub-Store-Front-End.git || true
           git fetch upstream master
-          BEFORE="$(git rev-parse HEAD)"
-          git merge --no-edit upstream/master
-          AFTER="$(git rev-parse HEAD)"
+
+          BEFORE=$(git rev-parse HEAD)
+          git merge --no-edit upstream/master || true
+          AFTER=$(git rev-parse HEAD)
+
           echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
           echo "after=$AFTER" >> "$GITHUB_OUTPUT"
-          if [ "$BEFORE" != "$AFTER" ]; then
+
+          # 更可靠的判断方式：检查是否有文件变化
+          if git diff --quiet HEAD~1 HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
             git push origin master
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Show synced commit
         run: |
           echo "Current commit: $(git rev-parse HEAD)"
           echo "Upstream commit: $(git rev-parse upstream/master)"
-          git --no-pager log --oneline -5
 
-      # ====================== 以下步骤仅在代码有更新时执行 ======================
+      # ====================== 只有 changed=true 时才执行 ======================
       - name: Set up Node.js
         if: steps.sync.outputs.changed == 'true'
         uses: actions/setup-node@v4
