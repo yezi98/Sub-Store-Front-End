@@ -2,10 +2,8 @@ name: Sync upstream and deploy Cloudflare Pages
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [sync-upstream]
   schedule:
-    # 每天北京时间 04:20 自动同步（UTC 20:20）
+    # 每天北京时间 04:20 执行（GitHub 使用 UTC）
     - cron: "20 20 * * *"
 
 permissions:
@@ -20,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout fork
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: master
@@ -56,7 +54,7 @@ jobs:
           echo "Upstream commit: $(git rev-parse upstream/master)"
           git --no-pager log --oneline -5
 
-      # 只有上游有更新时才执行后续构建和部署
+      # ====================== 以下步骤仅在代码有更新时执行 ======================
       - name: Set up Node.js
         if: steps.sync.outputs.changed == 'true'
         uses: actions/setup-node@v4
