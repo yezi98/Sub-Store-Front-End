@@ -277,6 +277,13 @@ export default {
       "goSettings": "К настройкам",
       "cancel": "Отмена"
     },
+    "commonTips": {
+      "open": "Подсказки общих настроек страницы деталей",
+      "title": "Общие настройки страницы деталей",
+      "content": "Режим отображения можно изменить в Профиль / Дополнительные настройки / Общие настройки страницы деталей.",
+      "goSettings": "К настройкам",
+      "cancel": "Отмена"
+    },
     "subConfig": {
       "btn": {
         "compare": "Предпросмотр",
@@ -930,7 +937,8 @@ export default {
     "remain": {
       "title": "оставшиеся узлы",
       "beforeIndicator": "до",
-      "afterIndicator": "после"
+      "afterIndicator": "после",
+      "indicatorDisabledTips": "Нет данных для {side}"
     },
     "nodeNames": {
       "entry": "Все имена",
@@ -1384,9 +1392,9 @@ export default {
     "isDefaultIcon": "Восстановить иконки по умолчанию",
     "isShowIcon": "Отображать иконки",
     "isSubItemMenuFold": "Сворачивать контекстное меню подписок",
-    "isEditorCommon": "Общие настройки редактора",
+    "isEditorCommon": "Общие настройки страницы деталей",
     "editorCommon": {
-      "title": "Общие настройки редактора"
+      "title": "Общие настройки страницы деталей"
     },
     "editorGrouping": {
       "title": "Группировка страниц деталей",

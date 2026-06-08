@@ -282,6 +282,13 @@ export default {
       goSettings: '去修改',
       cancel: '取消',
     },
+    commonTips: {
+      open: '详情页常用配置说明',
+      title: '详情页常用配置',
+      content: '可在 我的/更多设置/详情页常用配置 中调整展示方式',
+      goSettings: '去修改',
+      cancel: '取消',
+    },
     subConfig: {
       btn: {
         compare: '即时预览',
@@ -846,6 +853,7 @@ export default {
       title: '保留的节点',
       beforeIndicator: '操作前',
       afterIndicator: '操作后',
+      indicatorDisabledTips: '{side}无可显示数据',
     },
     nodeNames: {
       entry: '全部节点名',
@@ -1302,9 +1310,9 @@ export default {
     isDefaultIcon: '恢复默认图标',
     isShowIcon: '展示图标',
     isSubItemMenuFold: '收纳订阅页菜单功能',
-    isEditorCommon: '编辑页常用配置',
+    isEditorCommon: '详情页常用配置',
     editorCommon: {
-      title: '编辑页常用配置',
+      title: '详情页常用配置',
     },
     editorGrouping: {
       title: '详情页使用分组',
