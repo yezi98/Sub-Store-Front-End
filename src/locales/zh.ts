@@ -1082,11 +1082,13 @@ export default {
     editor: {
       create: {
         submit: "创建分享",
-        succeedNotify: "创建分享成功！",
+        succeedNotify: "创建分享成功",
+        succeedAndCopyNotify: "创建分享成功，链接已复制",
       },
       edit: {
         submit: "保存修改",
-        succeedNotify: "分享更新成功！",
+        succeedNotify: "分享更新成功",
+        succeedAndCopyNotify: "分享更新成功，链接已复制",
       },
       loadFailed: {
         title: "无法载入分享编辑页",
@@ -1342,6 +1344,7 @@ export default {
     invalidShareFakeNode: '无效分享返回假节点(防客户端缓存)',
     tabBar: '隐藏 "Gist 同步" 页',
     tabBar2: '隐藏 "文件" 页',
+    tabBar3: '隐藏 "分享" 页',
     auto2: '自定义设置 Key',
     hostapi: '自定义后端 API',
     currentHostApi: '当前后端 API',

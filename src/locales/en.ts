@@ -1127,11 +1127,13 @@ export default {
     editor: {
       create: {
         submit: "Create Share",
-        succeedNotify: "Share created successfully!",
+        succeedNotify: "Share created successfully",
+        succeedAndCopyNotify: "Share created and link copied",
       },
       edit: {
         submit: "Save Changes",
-        succeedNotify: "Share updated successfully!",
+        succeedNotify: "Share updated successfully",
+        succeedAndCopyNotify: "Share updated and link copied",
       },
       loadFailed: {
         title: "This share page could not be loaded",
@@ -1388,6 +1390,7 @@ export default {
     invalidShareFakeNode: "Invalid share returns fake info(to prevent caching)",
     tabBar: 'Hide "Sync" Page',
     tabBar2: 'Hide "File" Page',
+    tabBar3: 'Hide "Share" Page',
     auto2: "MoreSetting Key",
     hostapi: "Custom Backend API",
     currentHostApi: "Current Backend API",
