@@ -32,14 +32,17 @@ jobs:
           git fetch upstream master
 
           BEFORE=$(git rev-parse HEAD)
-          git merge --no-edit upstream/master || true
+          git merge --no-edit --no-commit upstream/master || true
+          # 保留自己的 .github，不引入上游 workflow 改动（否则默认 GITHUB_TOKEN 无权 push）
+          git checkout HEAD -- .github 2>/dev/null || true
+          git commit --no-edit || true
           AFTER=$(git rev-parse HEAD)
 
           echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
           echo "after=$AFTER" >> "$GITHUB_OUTPUT"
 
-          # 更可靠的判断方式：检查是否有文件变化
-          if git diff --quiet HEAD~1 HEAD; then
+          # 用 BEFORE/AFTER 对比判断是否真的合并了新提交
+          if [ "$BEFORE" = "$AFTER" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git push origin master
