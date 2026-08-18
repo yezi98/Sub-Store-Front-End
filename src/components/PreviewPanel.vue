@@ -19,6 +19,27 @@
         >
         <label for="prettyYaml">{{ prettyYamlLabel }}</label>
       </div>
+      <div class="preview-option-item">
+        <label>
+          <input
+            type="checkbox"
+            name="noFlow"
+            value="noFlow"
+            v-model="noFlow"
+          >
+          {{ noFlowLabel }}
+        </label>
+      </div>
+      <div class="preview-option-item">
+        <input
+          type="checkbox"
+          id="displayPreviewInWebPage"
+          name="displayPreviewInWebPage"
+          :checked="appearanceSetting.displayPreviewInWebPage"
+          @change="setDisplayPreviewInWebPage"
+        >
+        <label for="displayPreviewInWebPage">{{ displayPreviewInWebPageLabel }}</label>
+      </div>
     </div>
     <ul class="preview-list">
       <li v-for="platform in platformList" :key="platform.name">
@@ -87,6 +108,7 @@
 
   const includeUnsupportedProxy = ref(false);
   const prettyYaml = ref(false);
+  const noFlow = ref(false);
   const { copy, isSupported } = useClipboard();
   const { toClipboard: copyFallback } = useV3Clipboard();
   const { showNotify } = useAppNotifyStore();
@@ -104,6 +126,8 @@
     tipsOkText,
     includeUnsupportedProxyLabel,
     prettyYamlLabel,
+    noFlowLabel,
+    displayPreviewInWebPageLabel,
   } = defineProps<{
     name: string;
     displayName?: string;
@@ -113,6 +137,8 @@
     desc: string;
     includeUnsupportedProxyLabel: string;
     prettyYamlLabel: string;
+    noFlowLabel: string;
+    displayPreviewInWebPageLabel: string;
     url?: string;
     tipsTitle?: string;
     tipsContent?: string;
@@ -124,6 +150,7 @@
 
   const PREVIEW_INCLUDE_UNSUPPORTED_PROXY_KEY = "preview.includeUnsupportedProxy";
   const PREVIEW_PRETTY_YAML_KEY = "preview.prettyYaml";
+  const PREVIEW_NO_FLOW_KEY = "preview.noFlow";
 
   const getLocalStorageBoolean = (key: string): boolean => {
     if (typeof window === 'undefined' || !window.localStorage) {
@@ -150,6 +177,7 @@
   onMounted(() => {
     includeUnsupportedProxy.value = getLocalStorageBoolean(PREVIEW_INCLUDE_UNSUPPORTED_PROXY_KEY);
     prettyYaml.value = getLocalStorageBoolean(PREVIEW_PRETTY_YAML_KEY);
+    noFlow.value = getLocalStorageBoolean(PREVIEW_NO_FLOW_KEY);
   });
 
   watch(includeUnsupportedProxy, (value) => {
@@ -158,6 +186,23 @@
   watch(prettyYaml, (value) => {
     setLocalStorageBoolean(PREVIEW_PRETTY_YAML_KEY, value);
   });
+  watch(noFlow, (value) => {
+    setLocalStorageBoolean(PREVIEW_NO_FLOW_KEY, value);
+  });
+  const setDisplayPreviewInWebPage = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    try {
+      await changeAppearanceSetting({
+        appearanceSetting: {
+          displayPreviewInWebPage: input.checked,
+        },
+      });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      input.checked = appearanceSetting.value.displayPreviewInWebPage;
+    }
+  };
   const buildUrlWithQuery = (url: string, query: Record<string, string | boolean>): string => {
     if (!url) {
       return '';
@@ -185,6 +230,9 @@
     }
     if (prettyYaml.value) {
       query.prettyYaml = true;
+    }
+    if (noFlow.value) {
+      query.noFlow = true;
     }
     let previewUrl
     if (url) {
@@ -232,7 +280,7 @@
       icon: stash,
     },
     {
-      name: 'Mihomo',
+      name: 'mihomo',
       path: 'ClashMeta',
       icon: clashmeta,
     },
@@ -257,7 +305,7 @@
       icon: surge,
     },
     {
-      name: 'Surge(macOS)',
+      name: 'Surge Mac',
       path: 'SurgeMac',
       icon: surgeMac,
     },

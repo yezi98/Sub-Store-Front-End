@@ -2,6 +2,7 @@ import { useSettingsApi } from "@/api/settings";
 import i18n from "@/locales";
 import { useGlobalStore } from '@/store/global';
 import { useAppNotifyStore } from "@/store/appNotify";
+import { DEFAULT_IMAGE_FIT, normalizeImageFit } from "@/utils/iconFit";
 import { runFrontendRequestTask } from "@/utils/requestConcurrency";
 import { Toast } from "@nutui/nutui";
 import { defineStore } from "pinia";
@@ -13,6 +14,8 @@ const { t } = i18n.global;
 const LIST_PAGE_VIEW_MODE_STORAGE_KEY = "appearanceSetting.listPageViewMode";
 const NARROW_MODE_LIST_PAGE_VIEW_MODE_STORAGE_KEY = "appearanceSetting.listPageViewModeInWideScreenNarrowMode";
 const WIDE_SCREEN_NARROW_MODE_STORAGE_KEY = "appearanceSetting.useNarrowModeOnWideScreen";
+const EDITOR_GROUPING_MODE_STORAGE_KEY = "appearanceSetting.editorGroupingMode";
+const SIMPLE_MODE_CACHE_STORAGE_KEY = "appearanceSetting.isSimpleMode";
 const TAB_BAR_CACHE_STORAGE_KEY = "appearanceSetting.istabBar";
 const TAB_BAR2_CACHE_STORAGE_KEY = "appearanceSetting.istabBar2";
 const TAB_BAR3_CACHE_STORAGE_KEY = "appearanceSetting.istabBar3";
@@ -33,6 +36,40 @@ const normalizeSettingInputValue = (value: unknown) => {
   return value === null || value === undefined ? "" : String(value);
 };
 
+const getSettingsErrorMessage = (data?: MyAxiosRes) => {
+  return data?.status === "failed" ? data.error?.message : "";
+};
+
+export const normalizeGistDownloadTokenStrategy = (
+  value: unknown,
+): DownloadTokenStrategy => {
+  return value === "overwrite" || value === "keep" || value === "ask"
+    ? value
+    : "ask";
+};
+
+const createAppearanceSettingPatch = (
+  next?: SettingsPostData["appearanceSetting"],
+  current?: SettingsPostData["appearanceSetting"],
+  options?: {
+    forceEditorGroupingMode?: boolean;
+  },
+) => {
+  if (!next) return next;
+
+  const patch: SettingsPostData["appearanceSetting"] = {};
+  (Object.keys(next) as Array<keyof NonNullable<SettingsPostData["appearanceSetting"]>>).forEach((key) => {
+    if (next[key] !== current?.[key]) {
+      Object.assign(patch, { [key]: next[key] });
+    }
+  });
+  if (options?.forceEditorGroupingMode && isEditorGroupingMode(next.editorGroupingMode)) {
+    patch.editorGroupingMode = next.editorGroupingMode;
+  }
+
+  return patch;
+};
+
 const getCachedListPageViewMode = (storageKey: string): ListPageViewMode | undefined => {
   const cachedMode = localStorage.getItem(storageKey);
   if (cachedMode === "single-column" || cachedMode === "dual-column") {
@@ -50,6 +87,23 @@ const syncCachedListPageViewMode = (storageKey: string, mode?: ListPageViewMode)
   }
 };
 
+const isEditorGroupingMode = (value: unknown): value is EditorGroupingMode => {
+  return value === "edit-only" || value === "disabled" || value === "always";
+};
+
+const getCachedEditorGroupingMode = (): EditorGroupingMode | undefined => {
+  const cachedMode = localStorage.getItem(EDITOR_GROUPING_MODE_STORAGE_KEY);
+  return isEditorGroupingMode(cachedMode) ? cachedMode : undefined;
+};
+
+const syncCachedEditorGroupingMode = (mode?: EditorGroupingMode) => {
+  if (mode) {
+    localStorage.setItem(EDITOR_GROUPING_MODE_STORAGE_KEY, mode);
+  } else {
+    localStorage.removeItem(EDITOR_GROUPING_MODE_STORAGE_KEY);
+  }
+};
+
 const getCachedAppearanceBoolean = (storageKey: string, legacyStorageKey: string) => {
   const cachedValue = localStorage.getItem(storageKey);
   if (cachedValue === "1") return true;
@@ -59,6 +113,13 @@ const getCachedAppearanceBoolean = (storageKey: string, legacyStorageKey: string
   if (legacyValue === "1") return true;
 
   return undefined;
+};
+
+const getCachedSimpleMode = () => {
+  const cachedValue = getCachedAppearanceBoolean(SIMPLE_MODE_CACHE_STORAGE_KEY, "isSimpleMode");
+  if (cachedValue !== undefined) return cachedValue;
+
+  return localStorage.getItem("isSimpleMode") === "0" ? false : undefined;
 };
 
 const hasCachedAppearanceNavigationSetting = () => {
@@ -88,6 +149,10 @@ const hasRemoteAppearanceSetting = (appearanceSetting?: SettingsPostData["appear
   return Boolean(appearanceSetting && Object.keys(appearanceSetting).length > 0);
 };
 
+const hasRemoteEditorGroupingMode = (appearanceSetting?: SettingsPostData["appearanceSetting"]) => {
+  return isEditorGroupingMode(appearanceSetting?.editorGroupingMode);
+};
+
 const isEditorCommonDisplayMode = (value: unknown): value is EditorCommonDisplayMode => {
   return value === "expanded" || value === "collapsed" || value === "hidden";
 };
@@ -96,8 +161,8 @@ const isEditorSectionFoldMode = (value: unknown): value is EditorSectionFoldMode
   return value === "expanded" || value === "collapsed";
 };
 
-const isEditorGroupingMode = (value: unknown): value is EditorGroupingMode => {
-  return value === "edit-only" || value === "disabled" || value === "always";
+const isActionButtonsDisplayMode = (value: unknown): value is ActionButtonsDisplayMode => {
+  return value === "responsive" || value === "compact" || value === "loose";
 };
 
 const normalizeEditorCommonDisplayMode = (
@@ -111,7 +176,7 @@ const normalizeEditorCommonDisplayMode = (
     return appearanceSetting.isEditorCommon ? "expanded" : "hidden";
   }
 
-  return "collapsed";
+  return "expanded";
 };
 
 const normalizeManualSubscriptionsDisplayMode = (
@@ -124,6 +189,16 @@ const normalizeManualSubscriptionsDisplayMode = (
   return "collapsed";
 };
 
+const normalizeActionButtonsDisplayMode = (
+  appearanceSetting?: SettingsPostData["appearanceSetting"],
+): ActionButtonsDisplayMode => {
+  if (isActionButtonsDisplayMode(appearanceSetting?.actionButtonsDisplayMode)) {
+    return appearanceSetting.actionButtonsDisplayMode;
+  }
+
+  return "responsive";
+};
+
 const normalizeEditorGroupingMode = (
   appearanceSetting?: SettingsPostData["appearanceSetting"],
 ): EditorGroupingMode => {
@@ -131,7 +206,7 @@ const normalizeEditorGroupingMode = (
     return appearanceSetting.editorGroupingMode;
   }
 
-  return "edit-only";
+  return getCachedEditorGroupingMode() ?? "edit-only";
 };
 
 export const useSettingsStore = defineStore("settingsStore", {
@@ -139,6 +214,7 @@ export const useSettingsStore = defineStore("settingsStore", {
     return {
       syncPlatform: "",
       gistToken: "",
+      ageSecretKey: "",
       githubProxy: "",
       githubApiUrl: "",
       githubApiTimeout: "",
@@ -164,16 +240,18 @@ export const useSettingsStore = defineStore("settingsStore", {
         light: "light",
       },
       appearanceSetting: {
-        isSimpleMode: true,
+        isSimpleMode: getCachedSimpleMode() ?? true,
         isLeftRight: false,
         isDefaultIcon: false,
         isIconColor: false,
         isShowIcon: true,
+        iconFit: DEFAULT_IMAGE_FIT,
         isSimpleShowRemark: false,
         isEditorCommon: true,
-        editorCommonDisplayMode: "collapsed",
+        editorCommonDisplayMode: "expanded",
         manualSubscriptionsDisplayMode: "collapsed",
-        editorGroupingMode: "edit-only",
+        editorGroupingMode: getCachedEditorGroupingMode() ?? "edit-only",
+        actionButtonsDisplayMode: "responsive",
         isSimpleReicon: false,
         isSubItemMenuFold: true,
         showFloatingRefreshButton: false,
@@ -191,34 +269,49 @@ export const useSettingsStore = defineStore("settingsStore", {
         useNarrowModeOnWideScreen: getCachedWideScreenNarrowMode(),
       },
       gistUpload: "base64",
+      gistDownloadTokenStrategy: "ask",
       avatarUrl: "",
       artifactStore: "",
       artifactStoreStatus: "",
       hasFetchedSettings: false,
       hasRemoteAppearanceSetting: false,
+      hasRemoteEditorGroupingMode: false,
+      hasCachedEditorGroupingMode: getCachedEditorGroupingMode() !== undefined,
       hasCachedAppearanceNavigationSetting: hasCachedAppearanceNavigationSetting(),
       // ishostApi: localStorage.getItem('hostApi'),
     };
   },
   getters: {},
   actions: {
-    applyAppearanceSetting(appearanceSetting?: SettingsPostData["appearanceSetting"]) {
+    applyAppearanceSetting(
+      appearanceSetting?: SettingsPostData["appearanceSetting"],
+      options?: {
+        cacheEditorGroupingMode?: boolean;
+      },
+    ) {
       const cachedNarrowModeListPageViewMode = getCachedListPageViewMode(
         NARROW_MODE_LIST_PAGE_VIEW_MODE_STORAGE_KEY,
       );
+      const hasInputEditorGroupingMode = hasRemoteEditorGroupingMode(appearanceSetting);
       const editorCommonDisplayMode = normalizeEditorCommonDisplayMode(appearanceSetting);
       const manualSubscriptionsDisplayMode = normalizeManualSubscriptionsDisplayMode(appearanceSetting);
       const editorGroupingMode = normalizeEditorGroupingMode(appearanceSetting);
+      const actionButtonsDisplayMode = normalizeActionButtonsDisplayMode(appearanceSetting);
 
-      this.appearanceSetting.isSimpleMode = appearanceSetting?.isSimpleMode ?? true;
+      this.appearanceSetting.isSimpleMode =
+        appearanceSetting?.isSimpleMode
+        ?? getCachedSimpleMode()
+        ?? true;
       this.appearanceSetting.isLeftRight = appearanceSetting?.isLeftRight ?? "";
       this.appearanceSetting.isDefaultIcon = appearanceSetting?.isDefaultIcon ?? "";
       this.appearanceSetting.isIconColor = appearanceSetting?.isIconColor ?? "";
       this.appearanceSetting.isShowIcon = appearanceSetting?.isShowIcon ?? true;
+      this.appearanceSetting.iconFit = normalizeImageFit(appearanceSetting?.iconFit);
       this.appearanceSetting.isSimpleShowRemark = appearanceSetting?.isSimpleShowRemark ?? "";
       this.appearanceSetting.editorCommonDisplayMode = editorCommonDisplayMode;
       this.appearanceSetting.manualSubscriptionsDisplayMode = manualSubscriptionsDisplayMode;
       this.appearanceSetting.editorGroupingMode = editorGroupingMode;
+      this.appearanceSetting.actionButtonsDisplayMode = actionButtonsDisplayMode;
       this.appearanceSetting.isEditorCommon = editorCommonDisplayMode !== "hidden";
       this.appearanceSetting.isSimpleReicon = appearanceSetting?.isSimpleReicon ?? "";
       this.appearanceSetting.isSubItemMenuFold = appearanceSetting?.isSubItemMenuFold ?? true;
@@ -242,6 +335,10 @@ export const useSettingsStore = defineStore("settingsStore", {
         NARROW_MODE_LIST_PAGE_VIEW_MODE_STORAGE_KEY,
         this.appearanceSetting.listPageViewModeInWideScreenNarrowMode,
       );
+      localStorage.setItem(
+        SIMPLE_MODE_CACHE_STORAGE_KEY,
+        this.appearanceSetting.isSimpleMode ? "1" : "0",
+      );
 
       if (this.appearanceSetting.useNarrowModeOnWideScreen) {
         localStorage.setItem(WIDE_SCREEN_NARROW_MODE_STORAGE_KEY, "1");
@@ -250,6 +347,10 @@ export const useSettingsStore = defineStore("settingsStore", {
       }
 
       syncCachedAppearanceNavigationSetting(this.appearanceSetting);
+      if (options?.cacheEditorGroupingMode ?? (hasInputEditorGroupingMode || this.hasCachedEditorGroupingMode)) {
+        syncCachedEditorGroupingMode(this.appearanceSetting.editorGroupingMode);
+        this.hasCachedEditorGroupingMode = true;
+      }
       this.hasCachedAppearanceNavigationSetting = true;
     },
     async fetchSettings() {
@@ -258,6 +359,7 @@ export const useSettingsStore = defineStore("settingsStore", {
       if (res?.data?.status === "success" && res?.data?.data) {
         this.syncPlatform = res.data.data.syncPlatform || "";
         this.gistToken = res.data.data.gistToken || "";
+        this.ageSecretKey = res.data.data["age-secret-key"] || "";
         this.githubProxy = res.data.data.githubProxy || "";
         this.githubApiUrl = normalizeSettingInputValue(res.data.data.githubApiUrl);
         this.githubApiTimeout = normalizeSettingInputValue(res.data.data.githubApiTimeout);
@@ -287,8 +389,12 @@ export const useSettingsStore = defineStore("settingsStore", {
 
         this.hasFetchedSettings = true;
         this.hasRemoteAppearanceSetting = hasRemoteAppearanceSetting(res.data.data.appearanceSetting);
+        this.hasRemoteEditorGroupingMode = hasRemoteEditorGroupingMode(res.data.data.appearanceSetting);
         this.applyAppearanceSetting(res.data.data.appearanceSetting);
         this.gistUpload = res.data.data?.gistUpload ?? "base64";
+        this.gistDownloadTokenStrategy = normalizeGistDownloadTokenStrategy(
+          res.data.data.gistDownloadTokenStrategy,
+        );
       } else {
         this.hasFetchedSettings = false;
         showNotify({
@@ -297,12 +403,16 @@ export const useSettingsStore = defineStore("settingsStore", {
         });
       }
     },
-    async changeSettings(data: SettingsPostData) {
+    async changeSettings(
+      data: SettingsPostData,
+      options?: { notifySuccess?: boolean },
+    ) {
       const { showNotify } = useAppNotifyStore();
       const res = await settingsApi.setSettings(data);
       if (res?.data?.status === "success" && res?.data?.data) {
         this.syncPlatform = res.data.data.syncPlatform || "";
         this.gistToken = res.data.data.gistToken || "";
+        this.ageSecretKey = res.data.data["age-secret-key"] || "";
         this.githubProxy = res.data.data.githubProxy || "";
         this.githubApiUrl = normalizeSettingInputValue(res.data.data.githubApiUrl);
         this.githubApiTimeout = normalizeSettingInputValue(res.data.data.githubApiTimeout);
@@ -323,12 +433,17 @@ export const useSettingsStore = defineStore("settingsStore", {
         this.avatarUrl = res.data.data.avatarUrl || "";
         this.artifactStore = res.data.data.artifactStore || "";
         this.artifactStoreStatus = res.data.data.artifactStoreStatus || "";
-        this.gistUpload = res.data.data.gistUpload || "";
-        showNotify({ type: "success", title: t(`myPage.notify.save.succeed`) });
+        this.gistUpload = res.data.data.gistUpload || "base64";
+        this.gistDownloadTokenStrategy = normalizeGistDownloadTokenStrategy(
+          res.data.data.gistDownloadTokenStrategy,
+        );
+        if (options?.notifySuccess !== false) {
+          showNotify({ type: "success", title: t(`myPage.notify.save.succeed`) });
+        }
         return true;
       } else {
         showNotify({
-          title: `更新配置失败`,
+          title: getSettingsErrorMessage(res?.data) || `更新配置失败`,
           type: "danger",
         });
         return false;
@@ -353,8 +468,12 @@ export const useSettingsStore = defineStore("settingsStore", {
       const cachedHideShareTab = getCachedAppearanceBoolean(TAB_BAR3_CACHE_STORAGE_KEY, "istabBar3");
       const editorCommonDisplayMode = hasLocalEditorCommonSetting
         ? (isEditorCommon ? "expanded" : "hidden")
-        : "collapsed";
+        : "expanded";
       const editorGroupingMode = this.appearanceSetting.editorGroupingMode || "edit-only";
+      const hasLocalLegacyAppearanceSetting = hasLocalAppearanceSetting();
+      const shouldSyncEditorGroupingMode = this.hasCachedEditorGroupingMode
+        && !this.hasRemoteEditorGroupingMode
+        && isEditorGroupingMode(editorGroupingMode);
       const data = {
         isSimpleMode: isSimpleMode ?? false,
         isLeftRight: isLeftRight ?? false,
@@ -371,7 +490,7 @@ export const useSettingsStore = defineStore("settingsStore", {
         istabBar3: cachedHideShareTab ?? this.appearanceSetting.istabBar3 ?? false,
         subProgressStyle: subProgressStyle ?? "hidden",
       };
-      if (!hasLocalAppearanceSetting()) {
+      if (!hasLocalLegacyAppearanceSetting && !shouldSyncEditorGroupingMode) {
         return;
       }
 
@@ -380,14 +499,22 @@ export const useSettingsStore = defineStore("settingsStore", {
       }
 
       if (this.hasRemoteAppearanceSetting) {
-        this.removeLocalAppearanceSetting();
+        if (shouldSyncEditorGroupingMode) {
+          await this.changeAppearanceSetting({ appearanceSetting: { editorGroupingMode } });
+        }
+        if (hasLocalLegacyAppearanceSetting && this.hasRemoteAppearanceSetting) {
+          this.removeLocalAppearanceSetting();
+        }
         return;
       }
 
       // 如果有本地持久化的外观设置且后端还没有外观设置，则将其同步到后端
-      await this.changeAppearanceSetting({ appearanceSetting: data });
-      this.hasRemoteAppearanceSetting = true;
-      this.removeLocalAppearanceSetting();
+      await this.changeAppearanceSetting({
+        appearanceSetting: hasLocalLegacyAppearanceSetting ? data : { editorGroupingMode },
+      });
+      if (hasLocalLegacyAppearanceSetting && this.hasRemoteAppearanceSetting) {
+        this.removeLocalAppearanceSetting();
+      }
     },
     // 清除本地持久化的外观设置
     removeLocalAppearanceSetting() {
@@ -423,17 +550,54 @@ export const useSettingsStore = defineStore("settingsStore", {
     async changeAppearanceSetting(data: SettingsPostData) {
       Toast.loading("保存外观设置中...", { cover: true, id: "theme__loading" });
       const { showNotify } = useAppNotifyStore();
-      const res = await settingsApi.setSettings(data);
-      if (res?.data?.status === "success" && res?.data?.data) {
-        this.hasRemoteAppearanceSetting = hasRemoteAppearanceSetting(res.data.data.appearanceSetting);
-        this.applyAppearanceSetting(res.data.data.appearanceSetting);
-      } else {
-        showNotify({
-          title: `保存外观设置失败`,
-          type: "danger",
-        });
+      try {
+        const forceEditorGroupingMode = Boolean(
+          data.appearanceSetting
+          && !this.hasRemoteEditorGroupingMode
+          && this.hasCachedEditorGroupingMode
+          && isEditorGroupingMode(data.appearanceSetting.editorGroupingMode)
+        );
+        const requestData = data.appearanceSetting
+          ? {
+              ...data,
+              appearanceSetting: createAppearanceSettingPatch(
+                data.appearanceSetting,
+                this.appearanceSetting,
+                { forceEditorGroupingMode },
+              ),
+            }
+          : data;
+        const res = await settingsApi.setSettings(requestData);
+        if (res?.data?.status === "success" && res?.data?.data) {
+          const hasAppearanceSettingPatch = hasRemoteAppearanceSetting(requestData.appearanceSetting);
+          const responseHasAppearanceSetting = hasRemoteAppearanceSetting(res.data.data.appearanceSetting);
+          const responseHasEditorGroupingMode = hasRemoteEditorGroupingMode(res.data.data.appearanceSetting);
+          const requestHasEditorGroupingMode = isEditorGroupingMode(requestData.appearanceSetting?.editorGroupingMode);
+          this.hasRemoteAppearanceSetting = this.hasRemoteAppearanceSetting
+            || responseHasAppearanceSetting;
+          this.hasRemoteEditorGroupingMode = responseHasEditorGroupingMode;
+          this.applyAppearanceSetting(
+            hasAppearanceSettingPatch
+              ? {
+                  ...this.appearanceSetting,
+                  ...requestData.appearanceSetting,
+                }
+              : res.data.data.appearanceSetting,
+            {
+              cacheEditorGroupingMode: responseHasEditorGroupingMode
+                || requestHasEditorGroupingMode
+                || this.hasCachedEditorGroupingMode,
+            },
+          );
+        } else {
+          showNotify({
+            title: `保存外观设置失败`,
+            type: "danger",
+          });
+        }
+      } finally {
+        Toast.hide("theme__loading");
       }
-      Toast.hide("theme__loading");
     },
   },
 });

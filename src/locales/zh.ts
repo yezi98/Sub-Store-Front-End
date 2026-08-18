@@ -153,9 +153,10 @@ export default {
   },
   filePage: {
     type: {
-      mihomoProfile: 'Mihomo 配置',
-      mihomoProfileTips: '可使用覆写',
-      mihomoProfileTips2: '可使用 JavaScript/YAML 覆写',
+      mihomoConfig: 'mihomo 配置',
+      mihomoConfigTips: '可使用覆写',
+      mihomoConfigTips2: '可使用 JavaScript/YAML 覆写',
+      mihomoConfigScriptActionTips: '脚本操作中可使用 JavaScript/YAML 覆写',
     },
     addFileTitle: '创建文件',
     importFileTitle: '导入 Sub-Store 文件数据',
@@ -189,6 +190,11 @@ export default {
     source: {
       local: '本地',
       remote: '远程',
+    },
+    mode: {
+      label: '模式',
+      config: '作为 mihomo 配置',
+      proxy: '转换为 mihomo 节点',
     },
     ignoreFailedRemoteFile: {
       label: '远程文件失败处理',
@@ -264,7 +270,8 @@ export default {
       },
     },
     copyNotify: {
-      succeed: '复制订阅链接成功\n请导入代理工具使用',
+      succeed: '复制链接成功\n使用同步功能可不泄露路径',
+      succeedWithShare: '复制链接成功\n使用分享/同步功能可不泄露路径',
       failed: '复制订阅链接失败\n{e}',
     },
     copyConfigNotify: {
@@ -282,6 +289,7 @@ export default {
       options: {
         includeUnsupportedProxy: '含不支持的协议',
         prettyYaml: '更易读的 YAML',
+        noFlow: '不查询订阅流量信息',
       },
       tips: {
         ok: '查看文档',
@@ -322,6 +330,7 @@ export default {
         expiration: '有效期',
         display: '显示',
       },
+      sourceNameInputLabel: '输入/选择订阅名称',
       pop: {
         helpTitle: '节点操作帮助',
         helpContent:
@@ -435,6 +444,9 @@ export default {
         isIconColor: {
           label: '图标原色',
         },
+        iconFit: {
+          label: '图标填充模式',
+        },
         ignoreFailedRemoteSub: {
           label: '订阅失败处理',
           disabled: '严格报错',
@@ -458,6 +470,9 @@ export default {
           placeholder: '下载时使用的 UA，不填使用默认',
           placeholderDisabled: '透传时禁用自定义 UA',
         },
+        noFlow: {
+          label: '不查询订阅流量信息',
+        },
         subUserinfo: {
           label: '订阅流量信息',
           placeholder: '值/链接(链接支持 headers/noCache/headersCacheTtl 等参数)',
@@ -466,7 +481,7 @@ export default {
           label: '透传单条订阅流量信息',
           tips: {
             title: '透传单条订阅流量信息',
-            content: '默认透传第一个单条订阅流量信息。\n\n若需要合并组合订阅中所有单条订阅的流量，可使用脚本 https://t.me/zhetengsha/3070',
+            content: '默认透传第一个单条订阅流量信息。\n\n若需要合并组合订阅中所有单条订阅的流量，可使用脚本 https://telegram.me/zhetengsha/3070',
             okText: '查看',
           },
         },
@@ -489,26 +504,56 @@ export default {
         udp: {
           label: 'UDP 转发',
           default: '默认',
-          enabled: '强制开启',
-          disabled: '强制关闭',
+          enabled: '开启',
+          disabled: '关闭',
         },
         scert: {
           label: '跳过证书验证',
           default: '默认',
-          enabled: '强制开启',
-          disabled: '强制关闭',
+          enabled: '开启',
+          disabled: '关闭',
         },
         tfo: {
           label: 'TCP Fast Open',
           default: '默认',
-          enabled: '强制开启',
-          disabled: '强制关闭',
+          enabled: '开启',
+          disabled: '关闭',
         },
         'vmess aead': {
-          label: 'Vmess AEAD',
+          label: 'VMess AEAD',
           default: '默认',
-          enabled: '强制开启',
-          disabled: '强制关闭',
+          enabled: '开启',
+          disabled: '关闭',
+        },
+        reuse: {
+          label: '连接复用',
+          default: '默认',
+          enabled: '开启',
+          disabled: '关闭',
+        },
+        'block-quic': {
+          label: '阻止 QUIC',
+          default: '默认',
+          auto: '自动',
+          enabled: '开启',
+          disabled: '关闭',
+        },
+        ecn: {
+          label: 'ECN',
+          default: '默认',
+          enabled: '开启',
+          disabled: '关闭',
+        },
+        'ip-version': {
+          label: 'IP 版本',
+          default: '默认',
+          options: {
+            dual: '双栈',
+            v4Only: '仅 IPv4',
+            v6Only: '仅 IPv6',
+            preferV4: 'IPv4 优先',
+            preferV6: 'IPv6 优先',
+          },
         },
       },
       // surgeOptions: {
@@ -516,14 +561,15 @@ export default {
       //   hybrid: {
       //     label: 'Hybrid 策略',
       //     default: '默认',
-      //     open: '强制开启',
-      //     close: '强制关闭',
+      //     open: '开启',
+      //     close: '关闭',
       //   },
       // },
       actions: {
         label: '节点操作',
+        fileLabel: '文件操作',
         addAction: {
-          title: '添加一个操作',
+          title: '添加操作',
           cancel: '取消',
           confirm: '确认',
         },
@@ -543,13 +589,14 @@ export default {
           openEditorBtn: '打开脚本编辑器',
           tipsTitle: '脚本操作操作提示',
           tipsDes: '使用一段 JavaScript 脚本来修改节点信息',
-          paramsEdit: '参数编辑',
+          paramsExpand: '展开参数',
+          paramsCollapse: '收起参数',
           noCache: '关闭缓存',
           insecure: '不验证服务器证书',
           helpTitle: '温馨提示',
           noCacheTips: '关闭缓存后, 每次请求都会重新获取脚本内容',
           insecureTips: '开启后，将不对服务器证书进行验证。',
-          paramsEditTips: '可视化参数编辑器，重复键名将采用后值优先原则',
+          paramsEditTips: '可视化参数编辑器，重复键名将采用后值优先原则。由于历史遗留原因，布尔开关按“是否传入参数”判断，`false` 等非空字符串也会被视为启用。若不想启用某个参数就不要传这参数。',
           paramsAdd: '添加参数',
           paramsDelete: '删除',
           paramsOptions: '操作',
@@ -564,18 +611,33 @@ export default {
           openEditorBtn: '打开脚本编辑器',
           tipsTitle: '修改响应提示',
           tipsDes: '使用一段 JavaScript 脚本在发送下载响应前修改状态码、响应头或响应体；即时预览不会执行',
-          paramsEdit: '参数编辑',
+          paramsExpand: '展开参数',
+          paramsCollapse: '收起参数',
           noCache: '关闭缓存',
           insecure: '不验证服务器证书',
           helpTitle: '温馨提示',
           noCacheTips: '关闭缓存后, 每次请求都会重新获取脚本内容',
           insecureTips: '开启后，将不对服务器证书进行验证。',
-          paramsEditTips: '可视化参数编辑器，重复键名将采用后值优先原则',
+          paramsEditTips: '可视化参数编辑器，重复键名将采用后值优先原则。由于历史遗留原因，布尔开关按“是否传入参数”判断，`false` 等非空字符串也会被视为启用。若不想启用某个参数就不要传这参数。',
           paramsAdd: '添加参数',
           paramsDelete: '删除',
           paramsOptions: '操作',
           paramsEmpty: '暂无参数数据',
           duplicateKeyWarning: '重复的键名',
+        },
+        'Add Proxies From Subscription Operator': {
+          label: '从订阅添加节点',
+          tipsTitle: '从订阅添加节点提示',
+          tipsDes: '将单条订阅或组合订阅产出的 mihomo 节点写入当前 mihomo 配置的 proxies 字段',
+          des: {
+            source: '来源',
+            sourceName: '订阅',
+            includeUnsupportedProxy: '含不支持的协议',
+            position: '节点添加方式',
+          },
+          sourceOptions: ['单条订阅', '组合订阅'],
+          sourceNamePlaceholder: '输入/选择订阅名称',
+          positionOptions: ['覆盖', '插入到前面', '追加到后面'],
         },
         'Flag Operator': {
           label: '旗帜操作',
@@ -599,8 +661,18 @@ export default {
           types: ['IPv4', 'IPv6'],
           filters: ['不过滤', '移除失败', '只保留 IP', '只保留 IPv4', '只保留 IPv6'],
           cache: ['启用', '禁用'],
+          customDns: '自定义 DNS(全平台支持 DoH, Node.js 额外支持 DoT 和 TCP/UDP DNS)',
+          customDnsPlaceholder: '每行一个 DNS: DoH 或 [udp://]1.1.1.1[:53] 或 tcp://1.1.1.1[:53] 或 tls://223.5.5.5[:853] (括号内可省略)',
+          tlsSkipCertVerify: 'DoH/DoT 服务器证书',
+          tlsSkipCertVerifyOptions: ['验证', '不验证'],
+          dnsConcurrency: '多 DNS 并发数',
+          dnsConcurrencyPlaceholder: '默认 2',
           concurrency: '请求并发数',
           concurrencyPlaceholder: '默认 10. 在代理 App 中建议不超过 20',
+          timeout: 'DNS 超时',
+          timeoutPlaceholder: '默认使用全局请求超时(毫秒)',
+          cacheTtl: '缓存时长',
+          cacheTtlPlaceholder: '默认使用全局缓存时长(秒)',
           tipsTitle: '域名解析操作提示',
           tipsDes: '将节点域名解析成为 IP 地址，减少一次额外的 DNS 请求',
         },
@@ -633,11 +705,13 @@ export default {
             'mieru',
             'sudoku',
             'MASQUE',
+            'Shadow QUIC',
             'NaïveProxy',
             'AnyTLS',
             'TrustTunnel',
             'OpenVPN',
             'GOST Relay',
+            'ZeroTier',
             'Tailscale',
             'WireGuard',
             'SSH',
@@ -707,13 +781,14 @@ export default {
           openEditorBtn: '打开脚本编辑器',
           tipsTitle: '脚本过滤器操作提示',
           tipsDes: '使用一段 JavaScript 脚本来过滤节点',
-          paramsEdit: '参数编辑',
+          paramsExpand: '展开参数',
+          paramsCollapse: '收起参数',
           noCache: '关闭缓存',
           insecure: '不验证服务器证书',
           helpTitle: '温馨提示',
           noCacheTips: '关闭缓存后, 每次请求都会重新获取脚本内容',
           insecureTips: '开启后，将不对服务器证书进行验证。',
-          paramsEditTips: '可视化参数编辑器，重复键名将采用后值优先原则',
+          paramsEditTips: '可视化参数编辑器，重复键名将采用后值优先原则。由于历史遗留原因，布尔开关按“是否传入参数”判断，`false` 等非空字符串也会被视为启用。若不想启用某个参数就不要传这参数。',
           paramsAdd: '添加参数',
           paramsDelete: '删除',
           paramsOptions: '操作',
@@ -722,7 +797,7 @@ export default {
         },
       },
       sourceNamePicker: {
-        title: '选择订阅名称',
+        title: '请选择订阅',
         cancel: '取消',
         confirm: '确定',
         emptyTips: '未找到订阅？点击去添加订阅',
@@ -737,6 +812,7 @@ export default {
       haveNotDownload: '暂无下载记录',
       githubUser: '请输入 GitHub 用户名',
       gistToken: '请输入 GitHub 令牌',
+      gistAgeSecretKey: '请输入 Gist 备份 age 解密私钥',
       githubProxy: '请输入 GitHub 加速代理',
       githubApiUrl: 'GitHub API 地址(默认: https://api.github.com)',
       githubApiTimeout: 'GitHub API 请求超时(单位: 毫秒, 默认: 10000)',
@@ -799,6 +875,19 @@ export default {
     cacheConfig: "缓存配置",
     frontEndConfig: "前端配置",
     githubConfig: 'GitHub 配置',
+    downloadTokenStrategy: {
+      label: '下载时 Token',
+      ask: '每次询问（默认）',
+      overwrite: '覆盖 Token',
+      keep: '保留当前 Token',
+      dialog: {
+        title: 'Token 处理',
+        content: '保留当前 Token 需要后端 >= 2.19.83',
+        doNotAskAgain: '不再询问（可在 GitHub 配置中修改）',
+        overwrite: '覆盖 Token',
+        keep: '保留当前 Token',
+      },
+    },
     logsTitle: '后端日志',
     storage: {
       gist: {
@@ -977,7 +1066,7 @@ export default {
         label: '上传产物',
         tips: {
           title: '上传产物',
-          content: '后端需 >= 2.23.16\n\n开启后，定时同步会在生成产物后上传到当前同步仓库（如 Gist）。\n\n关闭后，定时同步只执行产物生成并更新上次执行时间，不上传，也不会生成新的 Gist 链接。适合刷新缓存，或在订阅/文件脚本中执行自己的上传、备份逻辑，例如上传到其他 Gist，或通过 WebDAV 备份/恢复数据。\n\n参考:\nhttps://t.me/zhetengsha/1428\nhttps://t.me/zhetengsha/5261',
+          content: '后端需 >= 2.23.16\n\n开启后，定时同步会在生成产物后上传到当前同步仓库（如 Gist）。\n\n关闭后，定时同步只执行产物生成并更新上次执行时间，不上传，也不会生成新的 Gist 链接。适合刷新缓存，或在订阅/文件脚本中执行自己的上传、备份逻辑，例如上传到其他 Gist，或通过 WebDAV 备份/恢复数据。\n\n参考:\nhttps://telegram.me/zhetengsha/1428\nhttps://telegram.me/zhetengsha/5261',
         },
       },
       cron: {
@@ -989,9 +1078,9 @@ export default {
         },
       },
       includeUnsupportedProxy: {
-        label: '包含不支持的协议(详见文档)',
+        label: '包含不支持的协议',
         tips: {
-          title: '包含不支持的协议(详见文档)',
+          title: '包含不支持的协议',
           content: 'https://github.com/sub-store-org/Sub-Store/wiki/%E9%93%BE%E6%8E%A5%E5%8F%82%E6%95%B0%E8%AF%B4%E6%98%8E'
         }
       },
@@ -1239,6 +1328,19 @@ export default {
       confirm: '确定',
     },
   },
+  imageFit: {
+    inherit: '跟随全局设置',
+    contain: 'contain',
+    cover: 'cover',
+    fill: 'fill',
+    none: 'none',
+    'scale-down': 'scale-down',
+    tips: {
+      title: '图片填充模式',
+      content: 'contain:<br>保持宽高缩放图片，使图片的长边能完全显示出来<br><br>cover:<br>保持宽高缩放图片，使图片的短边能完全显示出来，裁剪长边<br><br>fill:<br>拉伸图片，使图片填满元素<br><br>none:<br>保持图片原有尺寸<br><br>scale-down:<br>取 none 或 contain 中较小的一个',
+      close: '关闭',
+    },
+  },
   themeSettingPage: {
     themeSettingTitle: '外观设置',
     // themeSettingDes: '',
@@ -1255,7 +1357,8 @@ export default {
     apiSettingTitle: '后端管理',
     apiSettingDesc0: `1. 后端地址为 https://api.com 时, 将尝试请求 https://api.com/api/utils/env 验证后端可用性. 当无法添加后端地址时, 可先尝试访问此地址`,
     apiSettingDesc1: `2. HTTPS 前端无法请求非本地的 HTTP 后端(部分浏览器上也无法访问本地 HTTP 后端). 请配置反代或在局域网自建 HTTP 前端. `,
-    apiSettingDesc2: `3. 添加后端服务器地址，例如 服务器/NAS/Android/云平台 上搭建的后端服务。可以查看小一佬的后端搭建教程：`,
+    apiSettingDesc2: `3. 添加后端服务器地址，例如 服务器/NAS/Android/云平台 上搭建的后端服务。请查看 `,
+    apiSettingWiki: `Wiki#安装`,
     currentApi: {
       title: '当前后端',
     },
@@ -1265,9 +1368,10 @@ export default {
       defaultName: '默认后端',
       currentTag: '当前',
       copy: '复制链接',
-      editName: '编辑名称',
-      saveName: '保存名称',
+      editName: '编辑配置',
+      saveName: '保存配置',
       cancelEditName: '取消编辑',
+      shareBaseUrl: '分享链接服务器地址',
       delete: '删除',
     },
     switchApi: {
@@ -1278,10 +1382,12 @@ export default {
       placeholder: {
         name: '请输入后端名称，必须唯一',
         url: '请输入后端路径或地址',
+        shareBaseUrl: '分享链接服务器地址（可选，例如 https://a.com）',
       },
       errors: {
         nameEmpty: '名称不能为空',
         nameDuplicate: 'API 名称重复',
+        shareBaseUrlInvalid: '分享链接服务器地址必须是完整的 http(s) 地址',
       },
       btn: '添加',
       duplicate: {
@@ -1297,6 +1403,7 @@ export default {
       title: 'Gist 上传',
       base64: 'Base64 编码',
       plaintext: '明文(不带 GitHub Token)',
+      age: 'age 加密',
     },
     subProgress: {
       title: '订阅进度样式',
@@ -1331,10 +1438,17 @@ export default {
     isIC: '自定义图标使用原始颜色',
     isDefaultIcon: '恢复默认图标',
     isShowIcon: '展示图标',
+    iconFit: '图标填充模式',
     isSubItemMenuFold: '收纳订阅页菜单功能',
     isEditorCommon: '详情页常用配置',
     editorCommon: {
       title: '详情页常用配置',
+    },
+    actionButtons: {
+      title: '节点/文件操作按钮',
+      responsive: '响应式',
+      compact: '紧凑',
+      loose: '宽松',
     },
     editorGrouping: {
       title: '详情页使用分组',
@@ -1410,6 +1524,7 @@ export default {
       type: '类型',
       generate: '一键生成',
       applyPublic: '一键填入',
+      applyPair: '同时填入',
       derive: '从私钥生成',
       copyPublic: '复制',
       copySecret: '复制',
@@ -1418,8 +1533,10 @@ export default {
       clearSecret: '清空 age 解密私钥',
       copied: '已复制',
       filled: '已填入',
+      filledPair: '已填入私钥和公钥',
       error: 'age key 操作失败',
       tips: '只支持 age 原生 X25519 和 MLKEM768-X25519 key. 生成的 age 解密私钥只在此弹窗显示, 请妥善保存; age 加密公钥可写入配置字段用于加密最终输出.',
+      secretTips: '只支持 age 原生 X25519 和 MLKEM768-X25519 key. 生成的 age 解密私钥只在此弹窗显示, 请妥善保存; Gist age 加密会由后端从私钥推导公钥.',
     },
   },
   magicPath: {

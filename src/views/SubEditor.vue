@@ -33,7 +33,7 @@
         <nut-image
           :class="{ 'sub-item-customer-icon': !form.isIconColor }"
           :src="subIcon"
-          fit="cover"
+          :fit="formIconFit"
           show-loading
           @click="showIconPopup"
         />
@@ -145,6 +145,7 @@
             <nut-switch v-model="form.isIconColor" />
           </div>
         </nut-form-item>
+        <ImageFitPicker v-model="form.iconFit" :fallback-value="appearanceSetting.iconFit" />
         </div>
         <div v-show="!editorTabsEnabled || activeEditorTab === 'content'" class="editor-tab-content">
         <template v-if="editType === 'subs'">
@@ -254,6 +255,16 @@
               :readonly="passThroughUAOn"
               @click-left-icon="uaTips"
             />
+          </nut-form-item>
+
+          <nut-form-item
+            :label="$t(`editorPage.subConfig.basic.noFlow.label`)"
+            prop="noFlow"
+            class="ignore-failed-wrapper"
+          >
+            <div class="switch-wrapper">
+              <nut-switch v-model="form.noFlow" />
+            </div>
           </nut-form-item>
 
           <nut-form-item
@@ -398,6 +409,7 @@
                         v-if="element[2]"
                         :size="chooserAvatarSize"
                         :url="rewriteGithubUrl(element[2])"
+                        :style="{ '--icon-fit': element[5] }"
                         bg-color=""
                       ></nut-avatar>
                       <span class="sub-item">
@@ -413,6 +425,15 @@
               </draggable>
             </nut-checkboxgroup>
           </div>
+            <nut-form-item
+              :label="$t(`editorPage.subConfig.basic.noFlow.label`)"
+              prop="noFlow"
+              class="ignore-failed-wrapper"
+            >
+              <div class="switch-wrapper">
+                <nut-switch v-model="form.noFlow" />
+              </div>
+            </nut-form-item>
             <nut-form-item
               :label="$t(`editorPage.subConfig.basic.subUserinfo.label`)"
               prop="subUserinfo"
@@ -610,6 +631,7 @@ import HandleDuplicate from "@/views/editor/components/HandleDuplicate.vue";
 import Regex from "@/views/editor/components/Regex.vue";
 import Script from "@/views/editor/components/Script.vue";
 import IconPopup from "@/views/icon/IconPopup.vue";
+import ImageFitPicker from "@/components/ImageFitPicker.vue";
 import TagPopup from "@/components/TagPopup.vue";
 import AgeKeyHelper from "@/components/AgeKeyHelper.vue";
 import DesktopPicker from "@/components/DesktopPicker.vue";
@@ -631,6 +653,7 @@ import { useRoute, useRouter } from "vue-router";
 import cmView from "@/views/editCode/cmView.vue";
 import { useCodeStore } from "@/store/codeStore";
 import { createGithubProxyUrlRewriter } from "@/utils/githubProxy";
+import { normalizeOptionalImageFit, resolveImageFit } from "@/utils/iconFit";
 const cmStore = useCodeStore();
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -685,11 +708,13 @@ const SUB_EDITOR_PROP_TO_TAB: Partial<Record<string, SubEditorTab>> = {
   tag: "display",
   icon: "display",
   isIconColor: "display",
+  iconFit: "display",
   source: "content",
   url: "content",
   content: "content",
   passThroughUA: "content",
   ua: "content",
+  noFlow: "content",
   subUserinfo: "content",
   proxy: "content",
   mergeSources: "content",
@@ -780,7 +805,7 @@ const chooserAvatarSize = computed(() => {
   return appearanceSetting.value.isSimpleMode ? "28" : "32";
 });
 
-type SubSelectRow = [string, string, string | undefined, string[] | undefined, boolean];
+type SubSelectRow = [string, string, string | undefined, string[] | undefined, boolean, ImageFit];
 
   const sub = computed(() => subsStore.getOneSub(configName));
   const collection = computed(() => subsStore.getOneCollection(configName));
@@ -793,7 +818,8 @@ type SubSelectRow = [string, string, string | undefined, string[] | undefined, b
         item.displayName || item['display-name'] || item.name,
         item.icon || (appearanceSetting.value.isDefaultIcon ? logoIcon : logoRedIcon),
         item.tag,
-        item.isIconColor !== false
+        item.isIconColor !== false,
+        resolveImageFit(item.iconFit, appearanceSetting.value.iconFit),
       ];
     });
   });
@@ -938,8 +964,10 @@ const form = reactive<any>({
   mergeSources: "",
   ignoreFailedRemoteSub: false,
   passThroughUA: false,
+  noFlow: undefined,
   icon: "",
   isIconColor: true,
+  iconFit: undefined,
   process: [
     {
       type: "Quick Setting Operator",
@@ -1002,8 +1030,10 @@ watchEffect(() => {
   form.remark = sourceData.remark;
   form.icon = sourceData.icon;
   form.isIconColor = sourceData.isIconColor !== false;
+  form.iconFit = normalizeOptionalImageFit(sourceData.iconFit);
   form.editorLanguage = sourceData.editorLanguage;
   form.process = newProcess;
+  form.noFlow = sourceData.noFlow;
   form.subUserinfo = sourceData.subUserinfo;
   form.proxy = sourceData.proxy;
   form.tag = Array.isArray(sourceData.tag)
@@ -1271,6 +1301,14 @@ const submit = () => {
     });
     // 如果验证成功，开始保存/修改
     const data: any = JSON.parse(JSON.stringify(toRaw(form)));
+    const iconFit = normalizeOptionalImageFit(form.iconFit);
+    if (iconFit) {
+      data.iconFit = iconFit;
+    } else if (configName === "UNTITLED") {
+      delete data.iconFit;
+    } else {
+      data.iconFit = null;
+    }
     const agePublicKey = `${data["age-public-key"] || ""}`.trim();
     if (agePublicKey) {
       data["age-public-key"] = agePublicKey;
@@ -1399,6 +1437,7 @@ const urlValidator = (val: string): Promise<boolean> => {
       return rewriteGithubUrl(appearanceSetting.value.isDefaultIcon ? logoIcon : logoRedIcon)
     }
   })
+  const formIconFit = computed(() => resolveImageFit(form.iconFit, appearanceSetting.value.iconFit));
   const iconPopupVisible = ref(false)
   const showIconPopup = () => {
     iconPopupVisible.value = true
@@ -1439,14 +1478,14 @@ const urlValidator = (val: string): Promise<boolean> => {
         closeOnPopstate: true,
         lockScroll: false,
         onOk: () => {
-          window.open("https://t.me/zhetengsha/3070");
+          window.open("https://telegram.me/zhetengsha/3070");
         },
       });
   };
   const proxyTips = () => {
     Dialog({
         title: '通过代理/节点/策略获取订阅',
-        content: '1. Surge/Egern(参数 policy/policy-descriptor)\n\n可设置节点代理 例: Test = snell, 1.2.3.4, 80, psk=password, version=4\n\n或设置策略/节点 例: 国外加速\n\n2. Loon(参数 node)\n\nLoon 官方文档: \n\n指定该请求使用哪一个节点或者策略组（可以是节点名称、策略组名称，也可以是一个 Loon 格式的节点描述，如：shadowsocksr,example.com,1070,chacha20-ietf,"password",protocol=auth_aes128_sha1,protocol-param=test,obfs=plain,obfs-param=edge.microsoft.com）\n\n3. Stash(参数 headers["X-Surge-Policy"])/Shadowrocket(参数 headers.X-Surge-Policy)/QX(参数 opts.policy)\n\n可设置策略/节点\n\n4. Node.js 版(http/https/socks5):\n\n例: socks5://a:b@127.0.0.1:7890\n\n※ 优先级由高到低: 单条订阅, 组合订阅, 默认配置\n\n完整说明 请查看 https://t.me/zhetengsha/1843',
+        content: '1. Surge/Egern(参数 policy/policy-descriptor)\n\n可设置节点代理 例: Test = snell, 1.2.3.4, 80, psk=password, version=4\n\n或设置策略/节点 例: 国外加速\n\n2. Loon(参数 node)\n\nLoon 官方文档: \n\n指定该请求使用哪一个节点或者策略组（可以是节点名称、策略组名称，也可以是一个 Loon 格式的节点描述，如：shadowsocksr,example.com,1070,chacha20-ietf,"password",protocol=auth_aes128_sha1,protocol-param=test,obfs=plain,obfs-param=edge.microsoft.com）\n\n3. Stash(参数 headers["X-Surge-Policy"])/Shadowrocket(参数 headers.X-Surge-Policy)/QX(参数 opts.policy)\n\n可设置策略/节点\n\n4. Node.js 版(http/https/socks5):\n\n例: socks5://a:b@127.0.0.1:7890\n\n※ 优先级由高到低: 单条订阅, 组合订阅, 默认配置\n\n完整说明 请查看 https://telegram.me/zhetengsha/1843',
         popClass: 'auto-dialog',
         textAlign: 'left',
         okText: 'OK',
@@ -1789,9 +1828,23 @@ const handleEditGlobalClick = () => {
 }
 .radio-wrapper {
   display: flex;
-  // justify-content: start;
   flex-wrap: wrap;
   justify-content: flex-end;
+
+  :deep(.nut-radiogroup) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 5px;
+  }
+
+  :deep(.nut-radio) {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    line-height: 1;
+  }
 
   :deep(.nut-radio__button.false) {
     background: var(--divider-color);
@@ -1799,7 +1852,14 @@ const handleEditGlobalClick = () => {
     color: var(--second-text-color);
   }
   :deep(.nut-radio__button) {
-    padding: 5px 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 30px;
+    padding: 0 9px;
+    line-height: 18px;
+    white-space: nowrap;
   }
 }
 
@@ -2124,7 +2184,7 @@ const handleEditGlobalClick = () => {
           margin-right: 12px;
 
           :deep(img) {
-            object-fit: contain;
+            object-fit: var(--icon-fit, cover);
 
             &:not(.nut-icon__img) {
               filter: brightness(var(--img-brightness));

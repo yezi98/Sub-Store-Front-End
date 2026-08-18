@@ -53,7 +53,7 @@
           <nut-image
             :class="{ 'sub-item-customer-icon': !shareDisplayIsIconColor }"
             :src="shareDisplayIcon"
-            fit="cover"
+            :fit="shareDisplayIconFit"
             show-loading
             @click="showIconPopup"
           />
@@ -353,6 +353,7 @@
               <nut-switch v-model="form.isIconColor" />
             </div>
           </nut-form-item>
+          <ImageFitPicker v-model="form.iconFit" :fallback-value="appearanceSetting.iconFit" />
 
           <nut-form-item
             v-if="shouldShowShareUrlRow"
@@ -446,6 +447,7 @@ import logoIcon from "@/assets/icons/logo.png";
 import logoRedIcon from "@/assets/icons/logo-red.png";
 import AgeKeyHelper from "@/components/AgeKeyHelper.vue";
 import EditorGroupingTips from "@/components/EditorGroupingTips.vue";
+import ImageFitPicker from "@/components/ImageFitPicker.vue";
 import ShareExactDatetimeField from "@/components/ShareExactDatetimeField.vue";
 import TagPopup from "@/components/TagPopup.vue";
 import IconPopup from "@/views/icon/IconPopup.vue";
@@ -478,6 +480,7 @@ import {
   type ShareExpirationUnit,
 } from "@/utils/share";
 import { normalizeTagArray, stringifyTagInput } from "@/utils/shareTags";
+import { normalizeOptionalImageFit, resolveImageFit, type ImageFit } from "@/utils/iconFit";
 
 type EditorMode = "create" | "edit";
 type ShareSourceType = "sub" | "col" | "file";
@@ -514,9 +517,14 @@ const settingsStore = useSettingsStore();
 const subsStore = useSubsStore();
 const { bottomSafeArea } = storeToRefs(globalStore);
 const { navBarHeight } = storeToRefs(systemStore);
-const { appearanceSetting, githubProxy, githubProxyRegex, theme } = storeToRefs(settingsStore);
+const {
+  appearanceSetting,
+  githubProxy,
+  githubProxyRegex,
+  theme,
+} = storeToRefs(settingsStore);
 const { showNotify } = useAppNotifyStore();
-const { currentUrl: host } = useHostAPI();
+const { currentUrl: host, currentShareBaseUrl } = useHostAPI();
 const { env } = useBackend();
 const { copy, isSupported } = useClipboard();
 const preferredDark = usePreferredDark();
@@ -606,6 +614,7 @@ const form = reactive({
   tag: "",
   icon: "",
   isIconColor: true,
+  iconFit: undefined as ImageFit | undefined,
   shareUrl: "",
 });
 
@@ -788,6 +797,7 @@ const buildShareUrl = (
   try {
     return getSharePublicUrl({
       host: host.value,
+      shareBaseUrl: currentShareBaseUrl.value,
       secretPath: secretPath.value,
       type,
       name,
@@ -892,6 +902,9 @@ const hydrateForm = () => {
   form.isIconColor = routeMode.value === "edit" && activeSource.icon
     ? activeSource.isIconColor !== false
     : true;
+  form.iconFit = routeMode.value === "edit"
+    ? normalizeOptionalImageFit(activeSource.iconFit)
+    : undefined;
   form.shareUrl =
     activeSource.shareUrl
     || (
@@ -945,8 +958,9 @@ const shareDisplayIconState = computed(() => {
       ? {
           icon: form.icon,
           isIconColor: form.isIconColor,
+          iconFit: form.iconFit,
         }
-      : null,
+      : { iconFit: form.iconFit },
     source: selectedSourceItem.value,
     fallbackIcon: defaultShareIcon.value,
   });
@@ -956,6 +970,9 @@ const shareDisplayIcon = computed(() => {
 });
 const shareDisplayIsIconColor = computed(() => {
   return shareDisplayIconState.value.isIconColor;
+});
+const shareDisplayIconFit = computed(() => {
+  return resolveImageFit(shareDisplayIconState.value.iconFit, appearanceSetting.value.iconFit);
 });
 
 const syncSourceModel = () => {
@@ -1424,6 +1441,10 @@ const getSubmitParams = async (): Promise<ShareToken | null> => {
     remark: form.remark || "",
     tag: normalizeTagArray(form.tag),
   };
+  const iconFit = normalizeOptionalImageFit(form.iconFit);
+  if (iconFit) {
+    payload.iconFit = iconFit;
+  }
   const agePublicKey = form["age-public-key"].trim();
   if (agePublicKey) {
     payload["age-public-key"] = agePublicKey;
@@ -1674,6 +1695,23 @@ watch(
 );
 
 watch(
+  [host, currentShareBaseUrl, secretPath],
+  () => {
+    if (
+      isHydratingForm.value
+      || !isEditMode.value
+      || !selectedSourceType.value
+      || !normalizedSourceName.value
+      || !form.token
+    ) {
+      return;
+    }
+
+    form.shareUrl = buildShareUrl(selectedSourceType.value, normalizedSourceName.value, form.token);
+  },
+);
+
+watch(
   () => [
     form.sourceType,
     form.sourceName,
@@ -1827,6 +1865,21 @@ watch(
   justify-content: flex-end;
   flex-wrap: wrap;
 
+  :deep(.nut-radiogroup) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 5px;
+  }
+
+  :deep(.nut-radio) {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    line-height: 1;
+  }
+
   :deep(.nut-radio__button.false) {
     background: var(--divider-color);
     border-color: transparent;
@@ -1834,7 +1887,14 @@ watch(
   }
 
   :deep(.nut-radio__button) {
-    padding: 5px 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 30px;
+    padding: 0 9px;
+    line-height: 18px;
+    white-space: nowrap;
   }
 }
 

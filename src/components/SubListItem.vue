@@ -10,7 +10,7 @@
     <div
       class="sub-item-wrapper"
       :class="{ 'is-dual-column': props.isDualColumn }"
-      :style="{ padding: itemPadding }"
+      :style="{ padding: itemPadding, '--icon-fit': iconFit }"
       @click="handleContentClick"
     >
       <div
@@ -247,14 +247,14 @@
         </nut-button>
       </div>
       <div class="sub-item-swipe-btn-wrapper">
-        <a
-          :href="`${host}/api/${props.type}/${encodeURIComponent(name)}?raw=1`"
-          target="_blank"
+        <nut-button
+          shape="square"
+          type="success"
+          class="sub-item-swipe-btn"
+          @click="onClickExport"
         >
-          <nut-button shape="square" type="success" class="sub-item-swipe-btn">
-            <font-awesome-icon icon="fa-solid fa-file-export" />
-          </nut-button>
-        </a>
+          <font-awesome-icon icon="fa-solid fa-file-export" />
+        </nut-button>
       </div>
       <!-- preview -->
       <!-- <div class="sub-item-swipe-btn-wrapper">
@@ -287,14 +287,14 @@
         </nut-button>
       </div>
       <div class="sub-item-swipe-btn-wrapper">
-        <a
-          :href="`${host}/api/${props.type}/${encodeURIComponent(name)}?raw=1`"
-          target="_blank"
+        <nut-button
+          shape="square"
+          type="success"
+          class="sub-item-swipe-btn"
+          @click="onClickExport"
         >
-          <nut-button shape="square" type="success" class="sub-item-swipe-btn">
-            <font-awesome-icon icon="fa-solid fa-file-export" />
-          </nut-button>
-        </a>
+          <font-awesome-icon icon="fa-solid fa-file-export" />
+        </nut-button>
       </div>
       <div class="sub-item-swipe-btn-wrapper">
         <nut-button
@@ -342,8 +342,10 @@ import { useSettingsStore } from "@/store/settings";
 import { useSubsStore } from "@/store/subs";
 import { getString } from "@/utils/flowTransfer";
 import { createGithubProxyUrlRewriter } from "@/utils/githubProxy";
+import { resolveImageFit } from "@/utils/iconFit";
 import { isMobile } from "@/utils/isMobile";
 import { openManagedDeleteDialog } from "@/utils/archive";
+import { downloadBlobResponse } from "@/utils/download";
 import CompareTable from "@/views/CompareTable.vue";
 
 const props = defineProps<{
@@ -446,6 +448,9 @@ const rewriteGithubUrl = (url?: string | null) => {
 const isIconColor = computed(() => {
   return props[props.type].isIconColor !== false;
 });
+const iconFit = computed(() => {
+  return resolveImageFit(props[props.type].iconFit, appearanceSetting.value.iconFit);
+});
 
 const collectionDetail = computed(() => {
   const nameList = props?.collection.subscriptions || [];
@@ -483,6 +488,12 @@ const simpleCollectionDetailLine = computed(() => {
 
 const flow = computed(() => {
   if (props.type === "sub") {
+    if (props.sub.noFlow) {
+      return {
+        firstLine: t("subPage.subItem.noFlow"),
+        secondLine: ``,
+      };
+    }
     const urlList = Object.keys(flows.value);
     const localOnly =
       props.sub.source === "local" &&
@@ -861,9 +872,11 @@ const openPreviewPanel = () => {
       displayName,
       type: props.type,
       general: t("subPage.panel.general"),
-      notify: t("subPage.copyNotify.succeed"),
+      notify: t(`subPage.copyNotify.${shareBtnVisible.value ? "succeedWithShare" : "succeed"}`),
       includeUnsupportedProxyLabel: t("subPage.panel.options.includeUnsupportedProxy"),
       prettyYamlLabel: t("subPage.panel.options.prettyYaml"),
+      noFlowLabel: t("subPage.panel.options.noFlow"),
+      displayPreviewInWebPageLabel: t("moreSettingPage.displayPreviewInWebPage"),
       tipsTitle: t(`subPage.panel.tips.title`),
       tipsContent: `${t("subPage.panel.tips.content")}\n${t(
         "syncPage.addArtForm.includeUnsupportedProxy.tips.content",
@@ -919,26 +932,27 @@ const onClickCopyConfig = async () => {
   showNotify({ title: t("subPage.copyConfigNotify.succeed") });
   closeExpandedMenu();
 };
-// const onClickExport = async () => {
-//   swipeController()
-//   let data: Sub | Collection;
-//   switch (props.type) {
-//     case "sub":
-//       data = JSON.parse(JSON.stringify(toRaw(props.sub)));
-//       break;
-//     case "collection":
-//       data = JSON.parse(JSON.stringify(toRaw(props.collection)));
-//       break;
-//   }
-//   data.name += `-exportedAt${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-
-//   Toast.loading(t("subPage.copyConfigNotify.loading"), { id: "exportConfig" });
-//   // await subsApi.createSub(props.type + "s", data);
-//   // await subsStore.fetchSubsData();
-//   Toast.hide("exportConfig");
-//   showNotify({ title: t("subPage.copyConfigNotify.succeed") });
-//   swipe.value.close();
-// };
+const onClickExport = async () => {
+  Toast.loading(t("subPage.exportConfigNotify.loading"), { id: "exportConfig" });
+  try {
+    downloadBlobResponse(
+      await subsApi.exportOne(props.type, name),
+      `sub-store_${props.type}_${name}.json`,
+    );
+    showNotify({ title: t("subPage.exportConfigNotify.succeed") });
+  } catch (e) {
+    console.error(e);
+    showNotify({
+      type: "danger",
+      title: t("subPage.exportConfigNotify.failed", {
+        e: e instanceof Error ? e.message : e,
+      }),
+    });
+  } finally {
+    Toast.hide("exportConfig");
+    closeExpandedMenu();
+  }
+};
 
 const onClickEdit = () => {
   router.push(`/edit/${props.type}s/${encodeURIComponent(name)}`);
@@ -970,7 +984,7 @@ const onClickCopyLink = async () => {
   } else {
     await copyFallback(url);
   }
-  showNotify({ title: t("subPage.copyNotify.succeed") });
+  showNotify({ title: t(`subPage.copyNotify.${shareBtnVisible.value ? "succeedWithShare" : "succeed"}`) });
 };
 
 const onClickRefresh = async () => {
@@ -1035,7 +1049,7 @@ const refreshSubFlowsIfNeeded = async () => {
     border-radius: 12px;
 
     img {
-      object-fit: contain;
+      object-fit: var(--icon-fit, cover);
       border-radius: 10px;
     }
   }

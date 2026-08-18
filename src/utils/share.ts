@@ -58,11 +58,13 @@ export interface ShareExpirationFormState {
 interface ShareIconSourceLike {
   icon?: string | null;
   isIconColor?: boolean | null;
+  iconFit?: ImageFit | null;
 }
 
 export interface ShareDisplayIconState {
   icon: string;
   isIconColor: boolean;
+  iconFit?: ImageFit | null;
 }
 
 export const isShareExpirationMode = (value: unknown): value is ShareExpirationMode => {
@@ -120,6 +122,7 @@ export const resolveShareDisplayIconState = ({
     return {
       icon: shareIcon,
       isIconColor: share?.isIconColor !== false,
+      iconFit: share?.iconFit,
     };
   }
 
@@ -128,12 +131,14 @@ export const resolveShareDisplayIconState = ({
     return {
       icon: sourceIcon,
       isIconColor: source?.isIconColor !== false,
+      iconFit: share?.iconFit ?? source?.iconFit,
     };
   }
 
   return {
     icon: fallbackIcon,
     isIconColor: true,
+    iconFit: share?.iconFit,
   };
 };
 
@@ -439,23 +444,46 @@ export const getShareEditPath = (
 
 export const getSharePublicUrl = ({
   host,
+  shareBaseUrl,
   secretPath,
   type,
   name,
   token,
 }: {
   host: string;
+  shareBaseUrl?: string | null;
   secretPath: string;
   type: 'sub' | 'col' | 'file';
   name: string;
   token: string;
 }) => {
-  if (!secretPath.startsWith('/')) {
+  const normalizedShareBaseUrl = normalizeShareBaseUrl(shareBaseUrl);
+
+  if (!normalizedShareBaseUrl && !secretPath.startsWith('/')) {
     throw new Error('INVALID_SECRET_PATH');
   }
 
-  return `${host.replace(
-    new RegExp(`${secretPath}$`),
-    '',
-  )}/share/${type}/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
+  const publicHost = normalizedShareBaseUrl
+    || (host.endsWith(secretPath) ? host.slice(0, -secretPath.length) : host);
+
+  return `${publicHost}/share/${type}/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
+};
+
+export const normalizeShareBaseUrl = (value?: string | null) => {
+  return typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
+};
+
+export const isValidShareBaseUrl = (value?: string | null) => {
+  const normalizedValue = normalizeShareBaseUrl(value);
+
+  if (!normalizedValue) {
+    return true;
+  }
+
+  try {
+    const url = new URL(normalizedValue);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 };

@@ -37,7 +37,7 @@
             </p>
           </div>
         </div>
-        <div v-else class="avatar-wrapper">
+        <div v-else class="avatar-wrapper gist-avatar-wrapper">
           <nut-avatar
             :key="avatarDisplayKey"
             :class="{ 'avatar-fallback': isAvatarFallback }"
@@ -78,18 +78,20 @@
             />
             {{ $t(`myPage.storage.manual.restore`) }}
           </nut-button>
-          <a :href="host + '/api/storage'" target="_blank">
-            <nut-button
-              class="download-btn"
-              type="primary"
-              size="small"
-            >
-              <font-awesome-icon
-                icon="fa-solid fa-cloud-arrow-down"
-              />
-              {{ $t(`myPage.storage.manual.backup`) }}
-            </nut-button>
-          </a>
+          <nut-button
+            class="download-btn"
+            type="primary"
+            size="small"
+            :disabled="backupIsLoading"
+            :loading="backupIsLoading"
+            @click="downloadBackup"
+          >
+            <font-awesome-icon
+              v-if="!backupIsLoading"
+              icon="fa-solid fa-cloud-arrow-down"
+            />
+            {{ $t(`myPage.storage.manual.backup`) }}
+          </nut-button>
         </div>
         <div v-else class="actions">
           <nut-button
@@ -162,7 +164,7 @@
         </div>
         <div class="config-input-wrapper" v-if="isGitHubConfigEditing">
           <nut-input
-            class="input"
+            class="input input-small-left-icon"
             v-model="userInput"
             :disabled="!isGitHubConfigEditing"
             :placeholder="$t(`myPage.placeholder.githubUser`)"
@@ -175,7 +177,7 @@
             </template> -->
           </nut-input>
           <nut-input
-            class="input"
+            class="input input-small-left-icon"
             v-model="tokenInput"
             :disabled="!isGitHubConfigEditing"
             :placeholder="$t(`myPage.placeholder.gistToken`)"
@@ -183,6 +185,71 @@
             input-align="left"
             :left-icon="iconKey"
           />
+          <nut-input
+            class="input picker-input"
+            :model-value="gistUploadName"
+            readonly
+            :placeholder="$t(`moreSettingPage.gistUpload.title`)"
+            type="text"
+            input-align="left"
+            :left-icon="iconGistUpload"
+            right-icon="rect-right"
+            @click="openGistUploadPicker"
+            @click-right-icon="openGistUploadPicker"
+          />
+          <DesktopPicker
+            v-model="gistUploadPickerValue"
+            v-model:visible="showGistUploadPicker"
+            :columns="gistUploadColumns"
+            :title="$t(`moreSettingPage.gistUpload.title`)"
+            @confirm="handleGistUploadConfirm"
+          />
+          <nut-input
+            class="input picker-input"
+            :model-value="downloadTokenStrategyName"
+            readonly
+            :placeholder="$t(`myPage.downloadTokenStrategy.label`)"
+            type="text"
+            input-align="left"
+            :left-icon="iconKey"
+            right-icon="rect-right"
+            @click="openDownloadTokenStrategyPicker"
+            @click-right-icon="openDownloadTokenStrategyPicker"
+          />
+          <DesktopPicker
+            v-model="downloadTokenStrategyPickerValue"
+            v-model:visible="showDownloadTokenStrategyPicker"
+            :columns="downloadTokenStrategyColumns"
+            :title="$t(`myPage.downloadTokenStrategy.label`)"
+            @confirm="handleDownloadTokenStrategyConfirm"
+          />
+          <nut-input
+            v-if="isGistBackupAgeMode"
+            class="input"
+            v-model="ageSecretKeyInput"
+            :disabled="!isGitHubConfigEditing"
+            :placeholder="$t(`myPage.placeholder.gistAgeSecretKey`)"
+            type="text"
+            input-align="left"
+            :left-icon="iconEncryption"
+          >
+            <template #button>
+              <div class="input-action-icons">
+                <AgeKeyHelper
+                  v-if="isGitHubConfigEditing"
+                  v-model="ageSecretKeyInput"
+                  apply-mode="secret"
+                />
+                <button
+                  type="button"
+                  class="input-action-icon"
+                  @click="gistAgeSecretKeyTips"
+                >
+                  <nut-icon name="tips" />
+                </button>
+              </div>
+            </template>
+          </nut-input>
           <nut-input
             class="input"
             v-model="githubApiUrlInput"
@@ -611,16 +678,41 @@
       <p v-else>v{{ env.version }}</p>
       <p>{{ env.meta?.node?.env?.SUB_STORE_BACKEND_CUSTOM_NAME || env.backend }}</p>
     </div>
+
+    <nut-dialog
+      v-model:visible="showDownloadTokenDialog"
+      teleport="#app"
+      pop-class="download-token-dialog auto-dialog"
+      :title="$t(`myPage.downloadTokenStrategy.dialog.title`)"
+      :ok-text="$t(`myPage.downloadTokenStrategy.dialog.keep`)"
+      :cancel-text="$t(`myPage.downloadTokenStrategy.dialog.overwrite`)"
+      footer-direction="vertical"
+      close-on-popstate
+      :lock-scroll="false"
+      @ok="downloadWithTokenStrategy('keep')"
+      @cancel="downloadWithTokenStrategy('overwrite')"
+      @closed="rememberDownloadTokenStrategy = false"
+    >
+      <div class="download-token-dialog-content">
+        <p>{{ $t(`myPage.downloadTokenStrategy.dialog.content`) }}</p>
+        <label class="download-token-dialog-checkbox">
+          <input v-model="rememberDownloadTokenStrategy" type="checkbox">
+          <span>{{ $t(`myPage.downloadTokenStrategy.dialog.doNotAskAgain`) }}</span>
+        </label>
+      </div>
+    </nut-dialog>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { useSettingsApi } from "@/api/settings";
 import avatar from "@/assets/icons/avatar.svg?url";
-import iconKey from "@/assets/icons/key-solid.png";
-import iconUser from "@/assets/icons/user-solid.png";
+import iconKey from "@/assets/icons/key-solid.svg";
+import iconUser from "@/assets/icons/user-solid.svg";
 import iconProxy from "@/assets/icons/proxy.svg";
 import icongithubProxy from "@/assets/icons/githubProxy.svg";
+import iconEncryption from "@/assets/icons/encryption.svg";
+import iconGistUpload from "@/assets/icons/gist-upload.svg";
 import iconUA from "@/assets/icons/user-agent.svg";
 import iconMax from "@/assets/icons/max.svg";
 import iconHeadersCacheTtl from "@/assets/icons/headersCacheTtl.svg";
@@ -631,8 +723,12 @@ import iconTimeout from "@/assets/icons/timeout.svg";
 import iconConcurrency from "@/assets/icons/concurrency.svg";
 import { useAppNotifyStore } from "@/store/appNotify";
 import { useGlobalStore } from "@/store/global";
-import { useSettingsStore } from "@/store/settings";
+import {
+  normalizeGistDownloadTokenStrategy,
+  useSettingsStore,
+} from "@/store/settings";
 import { butifyDate } from "@/utils/butifyDate";
+import { downloadBlobResponse } from "@/utils/download";
 import { createGithubProxyUrlRewriter } from "@/utils/githubProxy";
 import { initStores } from "@/utils/initApp";
 import { storeToRefs } from "pinia";
@@ -642,6 +738,9 @@ import { useRouter } from "vue-router";
 import { useBackend } from "@/hooks/useBackend";
 import { useHostAPI } from '@/hooks/useHostAPI';
 import LanguageSwitcherButton from "@/components/LanguageSwitcherButton.vue";
+import AgeKeyHelper from "@/components/AgeKeyHelper.vue";
+import DesktopPicker from "@/components/DesktopPicker.vue";
+import { AGE_SECRET_KEY } from "@/utils/age";
 import { Dialog, Toast } from '@nutui/nutui';
 
 const { t } = useI18n();
@@ -651,10 +750,14 @@ const router = useRouter();
 const { showNotify } = useAppNotifyStore();
 const { currentUrl: host } = useHostAPI();
 const settingsStore = useSettingsStore();
-const { githubUser, gistToken, syncTime, defaultUserAgent, defaultFlowUserAgent, defaultProxy, defaultTimeout, backendRequestConcurrency, backendRequestConcurrencyWaitTime, cacheThreshold, resourceCacheTtl, headersCacheTtl, scriptCacheTtl, logsMaxCount, syncPlatform, githubProxy, githubApiUrl, githubApiTimeout, artifactSyncBatchSize, githubProxyRegex, gistUpload } =
+const { githubUser, gistToken, syncTime, defaultUserAgent, defaultFlowUserAgent, defaultProxy, defaultTimeout, backendRequestConcurrency, backendRequestConcurrencyWaitTime, cacheThreshold, resourceCacheTtl, headersCacheTtl, scriptCacheTtl, logsMaxCount, syncPlatform, githubProxy, githubApiUrl, githubApiTimeout, artifactSyncBatchSize, githubProxyRegex, gistUpload, gistDownloadTokenStrategy, ageSecretKey } =
   storeToRefs(settingsStore);
 
 const DEFAULT_GITHUB_API_URL = "https://api.github.com";
+const GIST_UPLOAD_MODES = ["base64", "age", "plaintext"] as const;
+const DOWNLOAD_TOKEN_STRATEGIES = ["ask", "overwrite", "keep"] as const;
+type GistUploadMode = typeof GIST_UPLOAD_MODES[number];
+
 const avatarLoadFailed = ref(false);
 const avatarRenderNonce = ref(0);
 
@@ -761,6 +864,13 @@ const onClickAbout = () => {
 const syncPlatformInput = ref("");
 const userInput = ref("");
 const tokenInput = ref("");
+const gistUploadInput = ref<GistUploadMode>("base64");
+const gistUploadPickerValue = ref<GistUploadMode[]>(["base64"]);
+const downloadTokenStrategyInput = ref<DownloadTokenStrategy>(
+  normalizeGistDownloadTokenStrategy(gistDownloadTokenStrategy.value),
+);
+const downloadTokenStrategyPickerValue = ref<DownloadTokenStrategy[]>([downloadTokenStrategyInput.value]);
+const ageSecretKeyInput = ref("");
 const githubProxyInput = ref("");
 const githubApiUrlInput = ref("");
 const githubApiTimeoutInput = ref("");
@@ -789,32 +899,111 @@ const isEditLoading = ref(false);
 const isInit = ref(false);
 const storageType = ref('gist');
 const fileInput = ref(null);
+const showGistUploadPicker = ref(false);
+const showDownloadTokenStrategyPicker = ref(false);
+const showDownloadTokenDialog = ref(false);
+const rememberDownloadTokenStrategy = ref(false);
+
+const normalizeGistUploadMode = (value?: string): GistUploadMode => {
+  return GIST_UPLOAD_MODES.includes(value as GistUploadMode) ? value as GistUploadMode : "base64";
+};
+
+const gistUploadColumns = computed(() => GIST_UPLOAD_MODES.map((value) => ({
+  text: t(`moreSettingPage.gistUpload.${value}`),
+  value,
+})));
+
+const gistUploadName = computed(() => t(`moreSettingPage.gistUpload.${gistUploadInput.value}`));
+const isGistBackupAgeMode = computed(() => gistUploadInput.value === "age");
+const downloadTokenStrategyColumns = computed(() => DOWNLOAD_TOKEN_STRATEGIES.map((value) => ({
+  text: t(`myPage.downloadTokenStrategy.${value}`),
+  value,
+})));
+const downloadTokenStrategyName = computed(() => {
+  return `${t("myPage.downloadTokenStrategy.label")}: ${t(`myPage.downloadTokenStrategy.${downloadTokenStrategyInput.value}`)}`;
+});
+
+const setDownloadTokenStrategyInput = (strategy: DownloadTokenStrategy) => {
+  downloadTokenStrategyInput.value = strategy;
+  downloadTokenStrategyPickerValue.value = [strategy];
+};
+
+const openGistUploadPicker = () => {
+  if (!isGitHubConfigEditing.value) return;
+  gistUploadPickerValue.value = [gistUploadInput.value];
+  showGistUploadPicker.value = true;
+};
+
+const handleGistUploadConfirm = ({ selectedValue }) => {
+  const mode = normalizeGistUploadMode(selectedValue?.[0]);
+  gistUploadInput.value = mode;
+  gistUploadPickerValue.value = [mode];
+};
+
+const openDownloadTokenStrategyPicker = () => {
+  if (!isGitHubConfigEditing.value) return;
+  downloadTokenStrategyPickerValue.value = [downloadTokenStrategyInput.value];
+  showDownloadTokenStrategyPicker.value = true;
+};
+
+const handleDownloadTokenStrategyConfirm = ({ selectedValue }) => {
+  setDownloadTokenStrategyInput(
+    normalizeGistDownloadTokenStrategy(selectedValue?.[0]),
+  );
+};
+
+const createSettingsPayload = (type: string): SettingsPostData => {
+  if (type === "github") {
+    const payload: SettingsPostData = {
+      syncPlatform: syncPlatformInput.value,
+      githubUser: userInput.value,
+      gistToken: tokenInput.value,
+      gistUpload: gistUploadInput.value,
+      gistDownloadTokenStrategy: downloadTokenStrategyInput.value,
+      githubProxy: githubProxyInput.value,
+      githubApiUrl: githubApiUrlInput.value,
+      githubApiTimeout: githubApiTimeoutInput.value,
+      artifactSyncBatchSize: artifactSyncBatchSizeInput.value,
+      githubProxyRegex: githubProxyRegexInput.value,
+    };
+
+    if (gistUploadInput.value === "age") {
+      payload[AGE_SECRET_KEY] = ageSecretKeyInput.value;
+    }
+
+    return payload;
+  }
+
+  if (type === "request") {
+    return {
+      defaultUserAgent: uaInput.value,
+      defaultFlowUserAgent: flowUaInput.value,
+      defaultProxy: proxyInput.value,
+      defaultTimeout: timeoutInput.value,
+      githubApiTimeout: githubApiTimeoutInput.value,
+      backendRequestConcurrency: backendRequestConcurrencyInput.value,
+      backendRequestConcurrencyWaitTime: backendRequestConcurrencyWaitTimeInput.value,
+    };
+  }
+
+  if (type === "cache") {
+    return {
+      cacheThreshold: cacheThresholdInput.value,
+      resourceCacheTtl: resourceCacheTtlInput.value,
+      headersCacheTtl: headersCacheTtlInput.value,
+      scriptCacheTtl: scriptCacheTtlInput.value,
+      logsMaxCount: logsMaxCountInput.value,
+    };
+  }
+
+  return {};
+};
 
 const toggleEditMode = async (type) => {
   isEditLoading.value = true;
   try {
     if ((type === 'github' && isGitHubConfigEditing.value) || (type === 'request' && isRequestConfigEditing.value) || (type === 'cache' && isCacheConfigEditing.value)) {
-      const saveSucceeded = await settingsStore.changeSettings({
-        syncPlatform: syncPlatformInput.value,
-        githubUser: userInput.value,
-        gistToken: tokenInput.value,
-        githubProxy: githubProxyInput.value,
-        githubApiUrl: githubApiUrlInput.value,
-        githubApiTimeout: githubApiTimeoutInput.value,
-        artifactSyncBatchSize: artifactSyncBatchSizeInput.value,
-        githubProxyRegex: githubProxyRegexInput.value,
-        defaultUserAgent: uaInput.value,
-        defaultFlowUserAgent: flowUaInput.value,
-        defaultProxy: proxyInput.value,
-        defaultTimeout: timeoutInput.value,
-        backendRequestConcurrency: backendRequestConcurrencyInput.value,
-        backendRequestConcurrencyWaitTime: backendRequestConcurrencyWaitTimeInput.value,
-        cacheThreshold: cacheThresholdInput.value,
-        resourceCacheTtl: resourceCacheTtlInput.value,
-        headersCacheTtl: headersCacheTtlInput.value,
-        scriptCacheTtl: scriptCacheTtlInput.value,
-        logsMaxCount: logsMaxCountInput.value,
-      });
+      const saveSucceeded = await settingsStore.changeSettings(createSettingsPayload(type));
 
       if (saveSucceeded && type === 'github') {
         resetAvatarState(true);
@@ -829,6 +1018,12 @@ const toggleEditMode = async (type) => {
       syncPlatformInput.value = syncPlatform.value;
       userInput.value = githubUser.value;
       tokenInput.value = gistToken.value;
+      gistUploadInput.value = normalizeGistUploadMode(gistUpload.value);
+      gistUploadPickerValue.value = [gistUploadInput.value];
+      setDownloadTokenStrategyInput(
+        normalizeGistDownloadTokenStrategy(gistDownloadTokenStrategy.value),
+      );
+      ageSecretKeyInput.value = ageSecretKey.value;
       githubProxyInput.value = githubProxy.value;
       githubApiUrlInput.value = githubApiUrl.value || "";
       githubApiTimeoutInput.value = githubApiTimeout.value || "";
@@ -990,6 +1185,12 @@ const toggleSyncPlatform = () => {
 const setDisplayInfo = () => {
   syncPlatformInput.value = syncPlatform.value || "";
   userInput.value = githubUser.value || "";
+  gistUploadInput.value = normalizeGistUploadMode(gistUpload.value);
+  gistUploadPickerValue.value = [gistUploadInput.value];
+  setDownloadTokenStrategyInput(
+    normalizeGistDownloadTokenStrategy(gistDownloadTokenStrategy.value),
+  );
+  ageSecretKeyInput.value = ageSecretKey.value || "";
   githubProxyInput.value = githubProxy.value || "";
   githubApiUrlInput.value = githubApiUrl.value || "";
   githubApiTimeoutInput.value = githubApiTimeout.value || "";
@@ -1013,6 +1214,7 @@ const setDisplayInfo = () => {
 const downloadIsLoading = ref(false);
 const uploadIsLoading = ref(false);
 const restoreIsLoading = ref(false);
+const backupIsLoading = ref(false);
 const syncIsDisabled = computed(() => {
   return (
     uploadIsLoading.value ||
@@ -1029,6 +1231,25 @@ const desText = computed(() => {
     return [t(`myPage.placeholder.uploadTime`), butifyDate(syncTime.value)];
   }
 });
+const downloadBackup = async () => {
+  backupIsLoading.value = true;
+  try {
+    const res = await useSettingsApi().downloadBackup();
+    downloadBlobResponse(res, 'sub-store_data.json');
+    showNotify({
+      type: "success",
+      title: t(`myPage.notify.download.succeed`),
+    });
+  } catch (e) {
+    showNotify({
+      type: "danger",
+      title: t(`myPage.notify.download.failed`),
+    });
+    console.error(e);
+  } finally {
+    backupIsLoading.value = false;
+  }
+};
 const fileChange = async (event) => {
   const file = event.target.files[0];
   if(!file) return
@@ -1089,7 +1310,7 @@ const upload = async() => {
   }
 }
 
-const sync = async (query: "download" | "upload", options?: { keep?: string[], encode?: 'base64' | 'plaintext' }) => {
+const sync = async (query: "download" | "upload", options?: GistBackupSyncOptions) => {
   switch (query) {
     case "download":
       downloadIsLoading.value = true;
@@ -1138,7 +1359,29 @@ const sync = async (query: "download" | "upload", options?: { keep?: string[], e
   uploadIsLoading.value = false;
 };
 
+const ensureGitHubConfigReadyForSync = (action: "upload" | "download") => {
+  if (!isGitHubConfigEditing.value) {
+    return true;
+  }
+
+  Dialog({
+    title: action === "upload" ? "请先保存 GitHub 配置" : "请先处理 GitHub 配置",
+    content: `当前 GitHub 配置正在编辑中，未保存的 Gist 配置不会用于本次${action === "upload" ? "上传" : "下载"}。\n\n请先保存或取消编辑后再继续。`,
+    popClass: "auto-dialog",
+    textAlign: "left",
+    okText: "知道了",
+    noCancelBtn: true,
+    closeOnPopstate: true,
+    lockScroll: false,
+  });
+
+  return false;
+};
+
 const uploadBtn = () => {
+  if (!ensureGitHubConfigReadyForSync("upload")) {
+    return;
+  }
   const encode = gistUpload.value || 'base64';
   sync('upload', { encode });
   // Dialog({
@@ -1163,25 +1406,46 @@ const uploadBtn = () => {
   // });
 }
 const downloadBtn = () => {
-  Dialog({
-    title: '请选择',
-    content: '若想保留本地当前已设置的 GitHub Token, 请选择保留(后端版本必须 >= 2.19.83)',
-    footerDirection: 'vertical',
-    onCancel: () => {
-      sync('download');
-    },
-    okText: '保留当前 Token, 覆盖其他数据',
-    cancelText: '覆盖(可能需重新设置 Token)',
-    onOk: () => {
-      sync('download', {
-        keep: ['settings.gistToken']
-      });
-    },
-    popClass: "auto-dialog",
-    closeOnPopstate: true,
-    lockScroll: false,
-  });
+  if (!ensureGitHubConfigReadyForSync("download")) {
+    return;
+  }
+
+  const strategy = normalizeGistDownloadTokenStrategy(
+    gistDownloadTokenStrategy.value,
+  );
+
+  if (strategy !== "ask") {
+    downloadWithTokenStrategy(strategy);
+    return;
+  }
+
+  rememberDownloadTokenStrategy.value = false;
+  showDownloadTokenDialog.value = true;
 }
+
+const downloadWithTokenStrategy = async (
+  strategy: Exclude<DownloadTokenStrategy, "ask">,
+) => {
+  if (rememberDownloadTokenStrategy.value) {
+    const saveSucceeded = await settingsStore.changeSettings(
+      { gistDownloadTokenStrategy: strategy },
+      { notifySuccess: false },
+    );
+    if (!saveSucceeded) return;
+    setDownloadTokenStrategyInput(strategy);
+  }
+
+  await sync(
+    "download",
+    {
+      tokenStrategy: strategy,
+      keep: [
+        "settings.gistDownloadTokenStrategy",
+        ...(strategy === "keep" ? ["settings.gistToken"] : []),
+      ],
+    },
+  );
+};
 const githubProxyTips = () => {
   Dialog({
       title: '请填写完整 GitHub 加速代理地址',
@@ -1222,6 +1486,18 @@ const githubApiTimeoutTips = () => {
       lockScroll: false,
     });
 };
+const gistAgeSecretKeyTips = () => {
+  Dialog({
+      title: 'Gist 备份 age 解密私钥',
+      content: '后端需 >= 2.29.0\n\n1. 选择 age 加密时只需要配置 age 解密私钥\n\n2. 上传备份时会从此私钥推导 age 加密公钥用于加密\n\n3. 下载恢复时会用此私钥解密 age 加密备份\n\n4. 请妥善保存私钥，丢失后无法恢复已加密备份',
+      popClass: 'auto-dialog',
+      textAlign: 'left',
+      okText: 'OK',
+      noCancelBtn: true,
+      closeOnPopstate: true,
+      lockScroll: false,
+    });
+};
 const artifactSyncBatchSizeTips = () => {
   Dialog({
       title: '同步上传分批大小',
@@ -1254,7 +1530,7 @@ const githubProxyRegexTips = () => {
 const proxyTips = () => {
   Dialog({
       title: '通过代理/节点/策略进行下载',
-      content: '1. Surge/Egern(参数 policy/policy-descriptor)\n\n可设置节点代理 例: Test = snell, 1.2.3.4, 80, psk=password, version=4\n\n或设置策略/节点 例: 国外加速\n\n2. Loon(参数 node)\n\nLoon 官方文档: \n\n指定该请求使用哪一个节点或者策略组（可以是节点名称、策略组名称，也可以是一个 Loon 格式的节点描述，如：shadowsocksr,example.com,1070,chacha20-ietf,"password",protocol=auth_aes128_sha1,protocol-param=test,obfs=plain,obfs-param=edge.microsoft.com）\n\n3. Stash(参数 headers["X-Surge-Policy"])/Shadowrocket(参数 headers.X-Surge-Policy)/QX(参数 opts.policy)\n\n可设置策略/节点\n\n4. Node.js 版(http/https/socks5):\n\n例: socks5://a:b@127.0.0.1:7890\n\n※ 优先级由高到低: 单条订阅, 组合订阅, 默认配置\n\n完整说明 请查看 https://t.me/zhetengsha/1843',
+      content: '1. Surge/Egern(参数 policy/policy-descriptor)\n\n可设置节点代理 例: Test = snell, 1.2.3.4, 80, psk=password, version=4\n\n或设置策略/节点 例: 国外加速\n\n2. Loon(参数 node)\n\nLoon 官方文档: \n\n指定该请求使用哪一个节点或者策略组（可以是节点名称、策略组名称，也可以是一个 Loon 格式的节点描述，如：shadowsocksr,example.com,1070,chacha20-ietf,"password",protocol=auth_aes128_sha1,protocol-param=test,obfs=plain,obfs-param=edge.microsoft.com）\n\n3. Stash(参数 headers["X-Surge-Policy"])/Shadowrocket(参数 headers.X-Surge-Policy)/QX(参数 opts.policy)\n\n可设置策略/节点\n\n4. Node.js 版(http/https/socks5):\n\n例: socks5://a:b@127.0.0.1:7890\n\n※ 优先级由高到低: 单条订阅, 组合订阅, 默认配置\n\n完整说明 请查看 https://telegram.me/zhetengsha/1843',
       popClass: 'auto-dialog',
       textAlign: 'left',
       okText: 'OK',
@@ -1511,8 +1787,58 @@ const setTag = (current) => {
             opacity: 0.2;
             filter: brightness(var(--img-brightness));
           }
+          &.input-small-left-icon {
+            :deep(img) {
+              width: 14px;
+              height: 14px;
+            }
+          }
           :deep(.nut-icon-tips:before) {
             cursor: pointer;
+          }
+          .input-action-icons {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+
+            :deep(.age-key-helper) {
+              justify-content: center;
+            }
+          }
+          .input-action-icon {
+            display: inline-flex;
+            width: 22px;
+            height: 22px;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--second-text-color);
+            cursor: pointer;
+
+            &:hover {
+              opacity: 1;
+            }
+
+            :deep(.nut-icon) {
+              color: inherit;
+            }
+
+            :deep(.nut-icon-tips:before) {
+              cursor: pointer;
+            }
+          }
+
+          &.picker-input {
+            cursor: pointer;
+
+            :deep(.nut-input__text),
+            :deep(input),
+            :deep(img),
+            :deep(.nut-icon) {
+              cursor: pointer;
+            }
           }
 
           &:not(:first-child) {
@@ -1585,6 +1911,10 @@ const setTag = (current) => {
             color: var(--comment-text-color);
           }
         }
+
+        &.gist-avatar-wrapper p.title {
+          font-size: 16px;
+        }
       }
 
       .actions {
@@ -1637,5 +1967,28 @@ const setTag = (current) => {
 
 .nut-icon {
   color: var(--lowest-text-color);
+}
+
+.download-token-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .download-token-dialog-checkbox {
+    display: flex;
+    align-items: center;
+    align-self: center;
+    gap: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+
+    input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: var(--primary-color);
+    }
+  }
 }
 </style>

@@ -3,6 +3,16 @@ type ListPageViewMode = 'single-column' | 'dual-column';
 type EditorCommonDisplayMode = 'expanded' | 'collapsed' | 'hidden';
 type EditorSectionFoldMode = 'expanded' | 'collapsed';
 type EditorGroupingMode = 'edit-only' | 'disabled' | 'always';
+type ActionButtonsDisplayMode = 'responsive' | 'compact' | 'loose';
+type GistUploadMode = 'base64' | 'plaintext' | 'age';
+type DownloadTokenStrategy = 'ask' | 'overwrite' | 'keep';
+type ImageFit = import('@/utils/iconFit').ImageFit;
+
+interface GistBackupSyncOptions {
+  keep?: string[];
+  encode?: GistUploadMode;
+  tokenStrategy?: Exclude<DownloadTokenStrategy, 'ask'>;
+}
 
 type SettingsStoreState = SettingsBase & SettingsPostData;
 
@@ -11,8 +21,11 @@ interface SettingsBase {
   avatarUrl: string;
   artifactStore: string;
   artifactStoreStatus?: string;
+  ageSecretKey: string;
   hasFetchedSettings: boolean;
   hasRemoteAppearanceSetting: boolean;
+  hasRemoteEditorGroupingMode: boolean;
+  hasCachedEditorGroupingMode: boolean;
   hasCachedAppearanceNavigationSetting: boolean;
   // ishostApi: string;
 }
@@ -20,6 +33,7 @@ interface SettingsBase {
 interface SettingsPostData {
   syncPlatform?: string;
   gistToken?: string;
+  "age-secret-key"?: string;
   githubProxy?: string;
   githubApiUrl?: string;
   githubApiTimeout?: string;
@@ -43,17 +57,20 @@ interface SettingsPostData {
     dark: CustomTheme;
     light: CustomTheme;
   };
-  gistUpload?: base64 | plaintext;
+  gistUpload?: GistUploadMode;
+  gistDownloadTokenStrategy?: DownloadTokenStrategy;
   appearanceSetting?: {
     isSimpleMode?: boolean; // 简洁模式
     isLeftRight?: boolean; // 卡片右滑呼出
     isDefaultIcon?: boolean; // 恢复默认图标
     isShowIcon?: boolean; // 展示图标
+    iconFit?: ImageFit; // 图标填充模式
     isIconColor?: boolean; // 自定义图标使用原始颜色
     isEditorCommon?: boolean; // 展示编辑页常用配置(旧版兼容)
     editorCommonDisplayMode?: EditorCommonDisplayMode; // 编辑页常用配置展示模式
     manualSubscriptionsDisplayMode?: EditorSectionFoldMode; // 手动选择的订阅展示模式
     editorGroupingMode?: EditorGroupingMode; // 详情页分组模式
+    actionButtonsDisplayMode?: ActionButtonsDisplayMode; // 节点/文件操作按钮展示模式
     isSimpleReicon?: boolean; // 展示订阅刷新按钮
     isSimpleShowRemark?: boolean; // 展示简洁模式下的备注
     isSubItemMenuFold?: boolean; // 订阅项菜单折叠

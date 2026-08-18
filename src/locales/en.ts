@@ -154,9 +154,10 @@ export default {
   },
   filePage: {
     type: {
-      mihomoProfile: 'Mihomo Profile',
-      mihomoProfileTips: 'Override is supported',
-      mihomoProfileTips2: 'Override(JavaScript/YAML) is supported',
+      mihomoConfig: 'mihomo config',
+      mihomoConfigTips: 'Override is supported',
+      mihomoConfigTips2: 'Override(JavaScript/YAML) is supported',
+      mihomoConfigScriptActionTips: 'Script actions can use JavaScript/YAML overrides',
     },
     addFileTitle: "Create File",
     importFileTitle: "Import File data",
@@ -193,6 +194,11 @@ export default {
     source: {
       local: "Local",
       remote: "Remote",
+    },
+    mode: {
+      label: "Mode",
+      config: "Use as mihomo config",
+      proxy: "Convert to mihomo proxies",
     },
     ignoreFailedRemoteFile: {
       label: "Remote File Failure Handling",
@@ -269,7 +275,8 @@ export default {
       },
     },
     copyNotify: {
-      succeed: "Successfully copied link!",
+      succeed: "Link copied successfully\nUse sync to avoid exposing the path",
+      succeedWithShare: "Link copied successfully\nUse share/sync to avoid exposing the path",
       failed: "Failed to copy subscription link!\n{e}",
     },
     copyConfigNotify: {
@@ -287,6 +294,7 @@ export default {
       options: {
         includeUnsupportedProxy: "Unsupported protocols",
         prettyYaml: "Readable YAML",
+        noFlow: "Do not query subscription traffic info",
       },
       tips: {
         ok: "View Document",
@@ -328,6 +336,7 @@ export default {
         expiration: "Expiration",
         display: "Display",
       },
+      sourceNameInputLabel: "Enter/select subscription name",
       pop: {
         helpTitle: "Help",
         helpContent:
@@ -447,6 +456,9 @@ export default {
         isIconColor: {
           label: 'Custom Icon Use Original Color',
         },
+        iconFit: {
+          label: "Icon fit",
+        },
         ignoreFailedRemoteSub: {
           label: "Sub Failure Handling",
           disabled: 'Strict Errors',
@@ -470,6 +482,9 @@ export default {
           placeholder: "The User-Agent for downloading resource(s)",
           placeholderDisabled: 'Disable custom UA when passing through',
         },
+        noFlow: {
+          label: "Do not query subscription traffic info",
+        },
         subUserinfo: {
           label: "Subscription-Userinfo",
           placeholder: "Value/URL(URL supports headers/noCache/headersCacheTtl etc.)",
@@ -478,7 +493,7 @@ export default {
           label: 'Pass Through Single Subscription Traffic Info',
           tips: {
             title: 'Pass Through Single Subscription Traffic Info',
-            content: 'By default, the first single subscription traffic info is passed through.\n\nTo merge traffic info from all single subscriptions in the collection, use the script at https://t.me/zhetengsha/3070',
+            content: 'By default, the first single subscription traffic info is passed through.\n\nTo merge traffic info from all single subscriptions in the collection, use the script at https://telegram.me/zhetengsha/3070',
             okText: 'View',
           },
         },
@@ -501,26 +516,56 @@ export default {
         udp: {
           label: "UDP Relay",
           default: "Default",
-          enabled: "Force Enable",
-          disabled: "Force Disable",
+          enabled: "Enable",
+          disabled: "Disable",
         },
         scert: {
           label: "Skip TLS Verification",
           default: "Default",
-          enabled: "Force Enable",
-          disabled: "Force Disable",
+          enabled: "Enable",
+          disabled: "Disable",
         },
         tfo: {
           label: "TCP Fast Open",
           default: "Default",
-          enabled: "Force Enable",
-          disabled: "Force Disable",
+          enabled: "Enable",
+          disabled: "Disable",
         },
         "vmess aead": {
-          label: "Vmess AEAD",
+          label: "VMess AEAD",
           default: "Default",
-          enabled: "Force Enable",
-          disabled: "Force Disable",
+          enabled: "Enable",
+          disabled: "Disable",
+        },
+        reuse: {
+          label: "Connection Reuse",
+          default: "Default",
+          enabled: "Enable",
+          disabled: "Disable",
+        },
+        "block-quic": {
+          label: "Block QUIC",
+          default: "Default",
+          auto: "Auto",
+          enabled: "Enable",
+          disabled: "Disable",
+        },
+        ecn: {
+          label: "ECN",
+          default: "Default",
+          enabled: "Enable",
+          disabled: "Disable",
+        },
+        "ip-version": {
+          label: "IP Version",
+          default: "Default",
+          options: {
+            dual: "Dual Stack",
+            v4Only: "IPv4 Only",
+            v6Only: "IPv6 Only",
+            preferV4: "Prefer IPv4",
+            preferV6: "Prefer IPv6",
+          },
         },
       },
       // surgeOptions: {
@@ -528,14 +573,15 @@ export default {
       //   hybrid: {
       //     label: 'Hybrid 策略',
       //     default: '默认',
-      //     open: '强制开启',
-      //     close: '强制关闭',
+      //     open: '开启',
+      //     close: '关闭',
       //   },
       // },
       actions: {
         label: "Node Actions",
+        fileLabel: "File Actions",
         addAction: {
-          title: "Add an action",
+          title: "Add action",
           cancel: "Cancel",
           confirm: "Confirm",
         },
@@ -583,8 +629,18 @@ export default {
             "IPv6 Only",
           ],
           cache: ["Enabled", "Disabled"],
+          customDns: "Custom DNS (DoH on all platforms; DoT and TCP/UDP DNS additionally in Node.js)",
+          customDnsPlaceholder: "One DNS per line: DoH, [udp://]1.1.1.1[:53], tcp://1.1.1.1[:53], or tls://223.5.5.5[:853] (brackets are optional)",
+          tlsSkipCertVerify: "DoH/DoT Server Certificate",
+          tlsSkipCertVerifyOptions: ["Verify", "Do Not Verify"],
+          dnsConcurrency: "Multi-DNS Concurrency",
+          dnsConcurrencyPlaceholder: "Default 2",
           concurrency: "Request Concurrency",
           concurrencyPlaceholder: "Default 10. Keep proxy apps at 20 or less",
+          timeout: "DNS Timeout",
+          timeoutPlaceholder: "Default: global request timeout (ms)",
+          cacheTtl: "Cache TTL",
+          cacheTtlPlaceholder: "Default: global cache TTL (seconds)",
           tipsTitle: "domain Tips",
           tipsDes: "Operation instructions for node domain name resolution",
         },
@@ -626,11 +682,13 @@ export default {
             "mieru",
             "sudoku",
             "MASQUE",
+            "Shadow QUIC",
             "NaïveProxy",
             "AnyTLS",
             'TrustTunnel',
             'OpenVPN',
             'GOST Relay',
+            'ZeroTier',
             'Tailscale',
             "WireGuard",
             "SSH",
@@ -699,13 +757,14 @@ export default {
           openEditorBtn: "Open Code Editor",
           tipsTitle: "Script Filter Tips",
           tipsDes: "Use a JavaScript script to filter nodes",
-          paramsEdit: 'Edit Parameters',
+          paramsExpand: 'Show Parameters',
+          paramsCollapse: 'Hide Parameters',
           helpTitle: 'Tips',
           noCache: 'noCache',
           insecure: 'insecure',
           noCacheTips: 'When the cache is turned off, the script is refetched for each request.',
           insecureTips: 'When the insecure is turned on, the server certificate will not be verified.',
-          paramsEditTips: 'Visual parameter editor, duplicate key names will adopt the principle of prioritizing the latter value.',
+          paramsEditTips: 'Visual parameter editor, duplicate key names will adopt the principle of prioritizing the latter value. For historical reasons, boolean switches are determined by whether the parameter is passed; non-empty strings such as `false` are also treated as enabled. If you do not want to enable a parameter, do not pass it.',
           paramsAdd: 'Add',
           paramsDelete: 'Delete',
           paramsOptions: 'Options',
@@ -721,13 +780,14 @@ export default {
           openEditorBtn: "Open Code Editor",
           tipsTitle: "Script Operator Tips",
           tipsDes: "Use a JavaScript script to modify node information",
-          paramsEdit: 'Edit Parameters',
+          paramsExpand: 'Show Parameters',
+          paramsCollapse: 'Hide Parameters',
           noCache: 'noCache',
           insecure: 'insecure',
           helpTitle: 'Tips',
           noCacheTips: 'When the cache is turned off, the script is refetched for each request.',
           insecureTips: 'When the insecure is turned on, the server certificate will not be verified.',
-          paramsEditTips: 'Visual parameter editor, duplicate key names will adopt the principle of prioritizing the latter value.',
+          paramsEditTips: 'Visual parameter editor, duplicate key names will adopt the principle of prioritizing the latter value. For historical reasons, boolean switches are determined by whether the parameter is passed; non-empty strings such as `false` are also treated as enabled. If you do not want to enable a parameter, do not pass it.',
           paramsAdd: 'Add',
           paramsDelete: 'Delete',
           paramsOptions: 'Options',
@@ -744,22 +804,38 @@ export default {
           tipsTitle: "Modify Response Tips",
           tipsDes:
             "Use a JavaScript script to modify the status code, headers, or body before sending the download response. Instant preview does not execute it.",
-          paramsEdit: 'Edit Parameters',
+          paramsExpand: 'Show Parameters',
+          paramsCollapse: 'Hide Parameters',
           noCache: 'noCache',
           insecure: 'insecure',
           helpTitle: 'Tips',
           noCacheTips: 'When the cache is turned off, the script is refetched for each request.',
           insecureTips: 'When the insecure is turned on, the server certificate will not be verified.',
-          paramsEditTips: 'Visual parameter editor, duplicate key names will adopt the principle of prioritizing the latter value.',
+          paramsEditTips: 'Visual parameter editor, duplicate key names will adopt the principle of prioritizing the latter value. For historical reasons, boolean switches are determined by whether the parameter is passed; non-empty strings such as `false` are also treated as enabled. If you do not want to enable a parameter, do not pass it.',
           paramsAdd: 'Add',
           paramsDelete: 'Delete',
           paramsOptions: 'Options',
           paramsEmpty: 'No parameters',
           duplicateKeyWarning: 'Duplicate key names',
         },
+        "Add Proxies From Subscription Operator": {
+          label: "Add Nodes From Subscription",
+          tipsTitle: "Add Nodes From Subscription Tips",
+          tipsDes:
+            "Add mihomo nodes produced by a single subscription or collection subscription to the current mihomo config proxies field.",
+          des: {
+            source: "Source",
+            sourceName: "Subscription",
+            includeUnsupportedProxy: "Include unsupported protocols",
+            position: "Node add mode",
+          },
+          sourceOptions: ["Single Subscription", "Collection Subscription"],
+          sourceNamePlaceholder: "Enter/select subscription name",
+          positionOptions: ["Replace", "Insert at Front", "Append at Back"],
+        },
       },
       sourceNamePicker: {
-        title: 'Select Subscription Name',
+        title: 'Select Subscription',
         cancel: 'Cancel',
         confirm: 'Confirm',
         emptyTips: 'Subscription not found? Click to add a subscription',
@@ -774,6 +850,7 @@ export default {
       haveNotDownload: "Not download yet",
       githubUser: "Please input GitHub username",
       gistToken: "Please input GitHub Token",
+      gistAgeSecretKey: "Enter Gist backup age decryption secret key",
       githubProxy: "Please input GitHub Proxy",
       githubApiUrl: "GitHub API URL (default: https://api.github.com)",
       githubApiTimeout: "GitHub API Request Timeout (in ms, default: 10000)",
@@ -836,6 +913,19 @@ export default {
     cacheConfig: "Cache Configuration",
     frontEndConfig: "Front-End Configuration",
     githubConfig: 'GitHub Configuration',
+    downloadTokenStrategy: {
+      label: "Token handling when downloading",
+      ask: "Always ask (default)",
+      overwrite: "Overwrite Token",
+      keep: "Keep current Token",
+      dialog: {
+        title: "Please choose",
+        content: "To keep the GitHub Token currently configured on this device, choose Keep (backend version must be >= 2.19.83).",
+        doNotAskAgain: "Don't ask again (GitHub settings)",
+        overwrite: "Overwrite (Token may need to be configured again)",
+        keep: "Keep current Token and overwrite other data",
+      },
+    },
     logsTitle: 'Backend Logs',
     storage: {
       gist: {
@@ -1013,7 +1103,7 @@ export default {
         tips: {
           title: "Upload Artifact",
           content:
-            "Requires backend >= 2.23.16.\n\nWhen enabled, scheduled sync uploads the generated artifact to the current sync storage, such as Gist.\n\nWhen disabled, scheduled sync only runs artifact generation and updates the last run time. It does not upload or create a new Gist URL. Use this to refresh caches, or to run custom upload/backup logic in subscriptions/files, such as uploading to another Gist or backing up/restoring via WebDAV.\n\nReferences:\nhttps://t.me/zhetengsha/1428\nhttps://t.me/zhetengsha/5261",
+            "Requires backend >= 2.23.16.\n\nWhen enabled, scheduled sync uploads the generated artifact to the current sync storage, such as Gist.\n\nWhen disabled, scheduled sync only runs artifact generation and updates the last run time. It does not upload or create a new Gist URL. Use this to refresh caches, or to run custom upload/backup logic in subscriptions/files, such as uploading to another Gist or backing up/restoring via WebDAV.\n\nReferences:\nhttps://telegram.me/zhetengsha/1428\nhttps://telegram.me/zhetengsha/5261",
         },
       },
       cron: {
@@ -1286,6 +1376,19 @@ export default {
       confirm: "Confirm",
     },
   },
+  imageFit: {
+    inherit: "Follow global setting",
+    contain: "contain",
+    cover: "cover",
+    fill: "fill",
+    none: "none",
+    "scale-down": "scale-down",
+    tips: {
+      title: "Image fit",
+      content: "contain:<br>Scale the image while keeping its aspect ratio so the long side is fully visible<br><br>cover:<br>Scale the image while keeping its aspect ratio so the short side is fully visible, cropping the long side<br><br>fill:<br>Stretch the image to fill the element<br><br>none:<br>Keep the original image size<br><br>scale-down:<br>Use the smaller result of none or contain",
+      close: "Close",
+    },
+  },
   themeSettingPage: {
     themeSettingTitle: "Appearance",
     auto: "Auto Switch",
@@ -1301,7 +1404,8 @@ export default {
     apiSettingTitle: "Backend Management",
     apiSettingDesc0: `1. When the backend server address is https://api.com, an attempt is made to request https://api.com/api/utils/env to verify backend availability. When the backend server address cannot be added, try accessing this address first.`,
     apiSettingDesc1: `2. HTTPS front-end cannot request non-local HTTP backend(Some browsers also cannot access the local HTTP backend.). Please configure a reverse proxy or host your own HTTP front-end on your LAN.`,
-    apiSettingDesc2: `Add the backend server address, such as the backend service built on server/NAS/Android/cloud platform. You can refer to XiaoYi's tutorial on setting up a backend: `,
+    apiSettingDesc2: `Add the backend server address, such as the backend service built on server/NAS/Android/cloud platform. You can refer to `,
+    apiSettingWiki: `Wiki#Install`,
     currentApi: {
       title: "Current Backend",
     },
@@ -1311,9 +1415,10 @@ export default {
       defaultName: "Default",
       currentTag: "Current",
       copy: "Copy link",
-      editName: "Edit name",
-      saveName: "Save name",
+      editName: "Edit config",
+      saveName: "Save config",
       cancelEditName: "Cancel edit",
+      shareBaseUrl: "Share server URL",
       delete: "Delete",
     },
     switchApi: {
@@ -1324,10 +1429,12 @@ export default {
       placeholder: {
         name: "Please input backend name, must be unique",
         url: "Please input backend path or address",
+        shareBaseUrl: "Share link server URL (optional, e.g. https://a.com)",
       },
       errors: {
         nameEmpty: "Name cannot be empty",
         nameDuplicate: "API name already exists",
+        shareBaseUrlInvalid: "Share link server URL must be a complete http(s) URL",
       },
       btn: "Add",
       duplicate: {
@@ -1343,6 +1450,7 @@ export default {
       title: 'Gist Upload',
       base64: 'Base64 Encoded',
       plaintext: 'Plaintext(w/o GitHub Token)',
+      age: 'age Encrypted',
     },
     subProgress: {
       title: "Subscription Progress Style",
@@ -1377,10 +1485,17 @@ export default {
     isIC: "Use original color for custom icons",
     isDefaultIcon: "Restore default icon",
     isShowIcon: 'Show icon',
+    iconFit: "Icon fit",
     isSubItemMenuFold: "Fold sub item menu",
     isEditorCommon: "Detail page common settings",
     editorCommon: {
       title: "Detail page common settings",
+    },
+    actionButtons: {
+      title: "Node/File action buttons",
+      responsive: "Responsive",
+      compact: "Compact",
+      loose: "Loose",
     },
     editorGrouping: {
       title: "Use grouping on detail pages",
@@ -1457,6 +1572,7 @@ export default {
       type: "Type",
       generate: "Generate",
       applyPublic: "Fill in",
+      applyPair: "Fill both",
       derive: "From secret",
       copyPublic: "Copy",
       copySecret: "Copy",
@@ -1465,9 +1581,12 @@ export default {
       clearSecret: "Clear age decryption secret key",
       copied: "Copied",
       filled: "Filled in",
+      filledPair: "Secret and public keys filled in",
       error: "age key operation failed",
       tips:
         "Only native age X25519 and MLKEM768-X25519 keys are supported. The generated age decryption secret key is shown only in this dialog; save it securely. The age encryption public key can be written to the config field to encrypt final output.",
+      secretTips:
+        "Only native age X25519 and MLKEM768-X25519 keys are supported. The generated age decryption secret key is shown only in this dialog; save it securely. Gist age encryption derives the public key from this secret key on the backend.",
     },
   },
   magicPath: {

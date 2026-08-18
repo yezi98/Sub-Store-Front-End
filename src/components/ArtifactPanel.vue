@@ -35,6 +35,7 @@
           <nut-switch v-model="isIconColor" />
         </div>
       </nut-form-item>
+      <ImageFitPicker v-model="editPanelData.iconFit" :fallback-value="appearanceSetting.iconFit" />
       <nut-form-item
         :label="$t(`syncPage.addArtForm.name.label`)"
         prop="name"
@@ -132,10 +133,10 @@
           >
             <nut-radio label="Stash">Stash</nut-radio>
             <nut-radio label="Egern">Egern</nut-radio>
-            <nut-radio label="ClashMeta">Mihomo</nut-radio>
+            <nut-radio label="ClashMeta">mihomo</nut-radio>
             <nut-radio label="Surfboard">Surfboard</nut-radio>
             <nut-radio label="Surge">Surge</nut-radio>
-            <nut-radio label="SurgeMac">Surge(macOS) <a href="https://github.com/sub-store-org/Sub-Store/wiki/%E9%93%BE%E6%8E%A5%E5%8F%82%E6%95%B0%E8%AF%B4%E6%98%8E" target="_blank">ⓘ</a></nut-radio>
+            <nut-radio label="SurgeMac">Surge Mac <a href="https://github.com/sub-store-org/Sub-Store/wiki/%E9%93%BE%E6%8E%A5%E5%8F%82%E6%95%B0%E8%AF%B4%E6%98%8E" target="_blank">ⓘ</a></nut-radio>
             <nut-radio label="Loon">Loon</nut-radio>
             <nut-radio label="ShadowRocket">Shadowrocket</nut-radio>
             <nut-radio label="QX">Quantumult X<span name="tips" @click="qxTips">&nbsp;ⓘ</span></nut-radio>
@@ -158,13 +159,19 @@
 
 <script lang="ts" setup>
   import { useArtifactsStore } from '@/store/artifacts';
+  import { useSettingsStore } from '@/store/settings';
   import { useSubsStore } from '@/store/subs';
+  import ImageFitPicker from '@/components/ImageFitPicker.vue';
   import IconPopup from '@/views/icon/IconPopup.vue';
+  import { normalizeOptionalImageFit } from '@/utils/iconFit';
   import { Dialog, Toast } from '@nutui/nutui';
+  import { storeToRefs } from 'pinia';
   import { computed, ref, toRaw, watchEffect } from 'vue';
   import { useI18n } from 'vue-i18n';
   const { t } = useI18n();
   const artifactsStore = useArtifactsStore();
+  const settingsStore = useSettingsStore();
+  const { appearanceSetting } = storeToRefs(settingsStore);
   const isInit = ref(false);
   const isEditMode = ref(false);
   const ruleForm = ref();
@@ -192,6 +199,7 @@
     displayName: '',
     icon: '',
     isIconColor: true,
+    iconFit: undefined,
     source: '',
     type: 'file',
     platform: 'Stash',
@@ -303,7 +311,15 @@
         return;
       }
 
-      const data = toRaw(editPanelData.value);
+      const data = { ...toRaw(editPanelData.value) };
+      const iconFit = normalizeOptionalImageFit(editPanelData.value.iconFit);
+      if (iconFit) {
+        data.iconFit = iconFit;
+      } else if (isEditMode.value) {
+        data.iconFit = null;
+      } else {
+        delete data.iconFit;
+      }
       Toast.loading(t('syncPage.addArtForm.submitLoading'), {
         cover: true,
         id: 'add-artifact-loading',
@@ -370,6 +386,7 @@
     if (!isInit.value && name) {
       const artifact = artifactsStore.artifacts.find(art => art.name === name);
       editPanelData.value = JSON.parse(JSON.stringify(toRaw(artifact)));
+      editPanelData.value.iconFit = normalizeOptionalImageFit(editPanelData.value.iconFit);
       sourceModel.value.push(
         editPanelData.value.type,
         editPanelData.value.source

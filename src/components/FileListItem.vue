@@ -11,7 +11,7 @@
     <div
       class="sub-item-wrapper"
       :class="{ 'is-dual-column': props.isDualColumn }"
-      :style="{ padding: itemPadding }"
+      :style="{ padding: itemPadding, '--icon-fit': iconFit }"
       @click="handleContentClick"
     >
       <div
@@ -162,10 +162,6 @@
         </nut-button>
       </div>
       <div class="sub-item-swipe-btn-wrapper">
-        <!-- <a
-          :href="`${host}/api/wholeFile/${encodeURIComponent(name)}?raw=1`"
-          target="_blank"
-        > -->
         <nut-button
           shape="square"
           type="success"
@@ -255,6 +251,7 @@
   import { useSubsStore } from '@/store/subs';
   import { getString } from '@/utils/flowTransfer';
   import { createGithubProxyUrlRewriter } from '@/utils/githubProxy';
+  import { resolveImageFit } from '@/utils/iconFit';
   import { isMobile } from '@/utils/isMobile';
   import { openManagedDeleteDialog } from '@/utils/archive';
   import FilePreview from '@/views/FilePreview.vue';
@@ -269,6 +266,9 @@
   import { useHostAPI } from '@/hooks/useHostAPI';
   import { useBackend } from "@/hooks/useBackend";
   import clashmetaIcon from '@/assets/icons/clashmeta_color.png';
+  import { isMihomoConfigFileType } from "@/utils/fileType";
+  import { formatPreviewError } from "@/utils/previewError";
+  import { downloadBlobResponse } from '@/utils/download';
 
   const { copy, isSupported } = useClipboard();
   const { toClipboard: copyFallback } = useV3Clipboard();
@@ -343,7 +343,7 @@
   });
   const { flows } = storeToRefs(subsStore);
   const icon = computed(() => {
-    if (props.file.type === 'mihomoProfile') return clashmetaIcon;
+    if (isMihomoConfigFileType(props.file.type)) return clashmetaIcon;
     return appearanceSetting.value.isDefaultIcon ? logoIcon : logoRedIcon;
   })
   const avatarSize = computed(() => {
@@ -371,6 +371,9 @@
   const isIconColor = computed(() => {
     return props.file.isIconColor !== false;
   });
+  const iconFit = computed(() => {
+    return resolveImageFit(props.file.iconFit, appearanceSetting.value.iconFit);
+  });
 
   const collectionDetail = computed(() => {
     const nameList = props?.collection.subscriptions || [];
@@ -388,7 +391,7 @@
   });
 
   const flow = computed(() => {
-    if (props.file.type === 'mihomoProfile') return t('filePage.type.mihomoProfile');
+    if (isMihomoConfigFileType(props.file.type)) return t('filePage.type.mihomoConfig');
     if (props.file.source === 'remote') return t('filePage.source.remote');
     return t('filePage.source.local');
   });
@@ -428,11 +431,11 @@
       if (res?.data?.status === 'success') {
         previewData.value = res.data.data;
       } else {
-        previewData.value = null;
+        previewData.value = { processed: formatPreviewError(res) };
       }
     } catch (e) {
       console.error(e);
-      previewData.value = null;
+      previewData.value = { processed: formatPreviewError(e) };
     }
     Toast.hide('compare');
   };
@@ -465,13 +468,9 @@
       subsStore.setOneData('files', name, latestFile);
     } catch (e) {
       console.error(e);
-      previewData.value = null;
+      previewData.value = { processed: formatPreviewError(e) };
       Toast.hide('compare');
     }
-  };
-
-  const swipeClose = () => {
-    swipe.value.close();
   };
 
   const swipeController = () => {
@@ -614,10 +613,26 @@
     return env.value?.feature?.share;
   });
 
-  const onClickExportFile = (name) => {
-    const url = `${host.value}/api/wholeFile/${encodeURIComponent(name)}?raw=1`;
-    console.log('url', url);
-    window.open(url, '_blank');  // 在新窗口中打开链接
+  const onClickExportFile = async (name: string) => {
+    Toast.loading(t('subPage.exportConfigNotify.loading'), { id: 'exportConfig' });
+    try {
+      downloadBlobResponse(
+        await filesApi.exportFile(name),
+        `sub-store_file_${name}.json`,
+      );
+      showNotify({ title: t('subPage.exportConfigNotify.succeed') });
+    } catch (e) {
+      console.error(e);
+      showNotify({
+        type: 'danger',
+        title: t('subPage.exportConfigNotify.failed', {
+          e: e instanceof Error ? e.message : e,
+        }),
+      });
+    } finally {
+      Toast.hide('exportConfig');
+      closeExpandedMenu();
+    }
   };
 
   const onClickShareLink = async () => {
@@ -671,7 +686,7 @@
       border-radius: 12px;
 
       img {
-        object-fit: contain;
+        object-fit: var(--icon-fit, cover);
         border-radius: 10px;
       }
     }

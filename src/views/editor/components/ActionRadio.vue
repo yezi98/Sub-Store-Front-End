@@ -20,11 +20,50 @@
         v-if="value === 'Custom'"
         class="radio-wrapper options-radio custom-dns-input-option"
       >
-        <p class="des-label">自定义 DNS(全平台支持 DoH, Node.js 额外支持 TCP/UDP DNS)</p>
-        <div class="input-wrapper compact-input-wrapper compact-input-wrapper--custom-dns">
-          <nut-input
-            placeholder="请输入 DoH 或 [udp://]1.1.1.1[:53] 或 tcp://1.1.1.1[:53] (括号内可省略)"
+        <p class="des-label">
+          {{ $t(`editorPage.subConfig.nodeActions['${type}'].customDns`) }}
+        </p>
+        <div class="input-wrapper compact-textarea-wrapper compact-textarea-wrapper--custom-dns">
+          <nut-textarea
+            :placeholder="$t(`editorPage.subConfig.nodeActions['${type}'].customDnsPlaceholder`)"
+            :rows="2"
+            :autosize="{ minHeight: 40 }"
             v-model="rdoUrl"
+          />
+        </div>
+      </div>
+      <div
+        v-if="value === 'Custom'"
+        class="radio-wrapper options-radio tls-skip-cert-option"
+      >
+        <p class="des-label">
+          {{
+            $t(`editorPage.subConfig.nodeActions['${type}'].tlsSkipCertVerify`)
+          }}
+        </p>
+        <nut-radiogroup direction="horizontal" v-model="rdoTlsSkipCertVerify">
+          <nut-radio
+            v-for="(key, index) in rdoTlsSkipCertVerifyOpt"
+            :label="key"
+            :key="index"
+            >{{
+              $t(
+                `editorPage.subConfig.nodeActions['${type}'].tlsSkipCertVerifyOptions[${index}]`
+              )
+            }}
+          </nut-radio>
+        </nut-radiogroup>
+      </div>
+      <div
+        v-if="value === 'Custom'"
+        class="radio-wrapper options-radio inline-input-option"
+      >
+        <p class="des-label">{{ $t(`editorPage.subConfig.nodeActions['${type}'].dnsConcurrency`) }}</p>
+        <div class="input-wrapper compact-input-wrapper compact-input-wrapper--concurrency">
+          <nut-input
+            type="number"
+            :placeholder="$t(`editorPage.subConfig.nodeActions['${type}'].dnsConcurrencyPlaceholder`)"
+            v-model="rdoDnsConcurrency"
           />
         </div>
       </div>
@@ -32,6 +71,16 @@
         <p class="des-label">EDNS(Google, Ali, Tencent, 自定义 DNS 会携带此参数, 可能会影响解析结果)</p>
         <div class="input-wrapper compact-input-wrapper compact-input-wrapper--edns">
           <nut-input placeholder="请输入纯 IP, 默认为 223.6.6.6" v-model="rdoEdns" />
+        </div>
+      </div>
+      <div class="radio-wrapper options-radio inline-input-option">
+        <p class="des-label">{{ $t(`editorPage.subConfig.nodeActions['${type}'].timeout`) }}</p>
+        <div class="input-wrapper compact-input-wrapper compact-input-wrapper--concurrency">
+          <nut-input
+            type="number"
+            :placeholder="$t(`editorPage.subConfig.nodeActions['${type}'].timeoutPlaceholder`)"
+            v-model="rdoTimeout"
+          />
         </div>
       </div>
       <div class="radio-wrapper options-radio inline-input-option">
@@ -44,7 +93,7 @@
           />
         </div>
       </div>
-      <div class="radio-wrapper options-radio">
+      <div class="radio-wrapper options-radio rdo-type-option">
         <p class="des-label" style="cursor: pointer" @click="rdoTypeInfo">解析类型(IPv6 兼容 IP4P <font-awesome-icon icon="fa-solid fa-circle-question"/>)</p>
         <nut-radiogroup direction="horizontal" v-model="rdoType">
           <nut-radio v-for="(key, index) in rdoTypeOpt" :label="key" :key="index"
@@ -75,6 +124,19 @@
             }}
           </nut-radio>
         </nut-radiogroup>
+      </div>
+      <div
+        v-if="rdoCache === 'enabled'"
+        class="radio-wrapper options-radio inline-input-option"
+      >
+        <p class="des-label">{{ $t(`editorPage.subConfig.nodeActions['${type}'].cacheTtl`) }}</p>
+        <div class="input-wrapper compact-input-wrapper compact-input-wrapper--concurrency">
+          <nut-input
+            type="number"
+            :placeholder="$t(`editorPage.subConfig.nodeActions['${type}'].cacheTtlPlaceholder`)"
+            v-model="rdoCacheTtl"
+          />
+        </div>
       </div>
     </template>
     <template v-if="type === 'Flag Operator' && foNewVersion && value === 'add'">
@@ -131,6 +193,7 @@
   const rdoTypeOpt = ['IPv4', 'IPv6'];
   const rdoFilterOpt = ['disabled', 'removeFailed', 'IPOnly', 'IPv4Only', 'IPv6Only'];
   const rdoCacheOpt = ['enabled' , 'disabled'];
+  const rdoTlsSkipCertVerifyOpt = ['disabled', 'enabled'];
 
   const value = ref();
   const rdoNewVersion = ref(true);
@@ -150,9 +213,13 @@
   const rdoType = ref('IPv4');
   const rdoFilter = ref('disabled');
   const rdoCache = ref('enabled');
+  const rdoTlsSkipCertVerify = ref('disabled');
   const rdoUrl = ref('');
   const rdoEdns = ref('');
+  const rdoDnsConcurrency = ref('');
   const rdoConcurrency = ref('');
+  const rdoTimeout = ref('');
+  const rdoCacheTtl = ref('');
 
   const normalizeRdoConcurrency = () => {
     const value = `${rdoConcurrency.value ?? ''}`.trim();
@@ -160,6 +227,33 @@
   };
 
   const getInitialRdoConcurrency = (value) => {
+    return `${value ?? ''}`.trim();
+  };
+
+  const normalizeRdoDnsConcurrency = () => {
+    const value = `${rdoDnsConcurrency.value ?? ''}`.trim();
+    return value || undefined;
+  };
+
+  const getInitialRdoDnsConcurrency = (value) => {
+    return `${value ?? ''}`.trim();
+  };
+
+  const normalizeRdoTimeout = () => {
+    const value = `${rdoTimeout.value ?? ''}`.trim();
+    return value || undefined;
+  };
+
+  const getInitialRdoTimeout = (value) => {
+    return `${value ?? ''}`.trim();
+  };
+
+  const normalizeRdoCacheTtl = () => {
+    const value = `${rdoCacheTtl.value ?? ''}`.trim();
+    return value || undefined;
+  };
+
+  const getInitialRdoCacheTtl = (value) => {
     return `${value ?? ''}`.trim();
   };
 
@@ -200,23 +294,43 @@
           value.value = item.args ?? 'asc';
           break;
         case 'Resolve Domain Operator':
-          value.value = item.args?.provider ?? 'Google';
+          value.value = item.args?.provider ?? 'Custom';
           rdoType.value = item.args?.type ?? 'IPv4';
           if (rdoType.value === 'IP4P') {
             rdoType.value = 'IPv6';
           }
           rdoFilter.value = item.args?.filter ?? 'disabled';
           rdoCache.value = item.args?.cache ?? 'enabled';
+          rdoTlsSkipCertVerify.value =
+            item.args?.tlsSkipCertVerify ?? 'disabled';
           rdoUrl.value = item.args?.url ?? '';
           rdoEdns.value = item.args?.edns;
+          rdoDnsConcurrency.value = getInitialRdoDnsConcurrency(
+            item.args?.dnsConcurrency
+          );
           rdoConcurrency.value = getInitialRdoConcurrency(item.args?.concurrency);
+          rdoTimeout.value = getInitialRdoTimeout(item.args?.timeout);
+          rdoCacheTtl.value = getInitialRdoCacheTtl(item.args?.cacheTtl);
           break;
       }
     }
   });
 
   // 值变化时实时修改 form 的数据
-  watch([value, rdoFilter, rdoCache, rdoUrl, rdoEdns, rdoConcurrency, rdoType, foTw], () => {
+  watch([
+    value,
+    rdoFilter,
+    rdoCache,
+    rdoTlsSkipCertVerify,
+    rdoUrl,
+    rdoEdns,
+    rdoDnsConcurrency,
+    rdoConcurrency,
+    rdoTimeout,
+    rdoCacheTtl,
+    rdoType,
+    foTw,
+  ], () => {
     if (['IPv6', 'IP4P'].includes(rdoType.value) && ['IP-API'].includes(value.value)) {
       showNotify({
         title: `${value.value} 不支持 ${rdoType.value}`,
@@ -240,9 +354,16 @@
           type: rdoType.value,
           filter: rdoFilter.value,
           cache: rdoCache.value,
+          tlsSkipCertVerify: rdoTlsSkipCertVerify.value,
           url: rdoUrl.value,
           edns: rdoEdns.value,
+          dnsConcurrency: normalizeRdoDnsConcurrency(),
           concurrency: normalizeRdoConcurrency(),
+          timeout: normalizeRdoTimeout(),
+          cacheTtl:
+            rdoCache.value === 'enabled'
+              ? normalizeRdoCacheTtl()
+              : undefined,
         };
         break;
     }
@@ -319,11 +440,45 @@
   .compact-input-wrapper--edns {
     max-width: 520px;
   }
+  .compact-input-wrapper--custom-dns {
+    max-width: 760px;
+  }
+  .compact-textarea-wrapper {
+    :deep(.nut-textarea) {
+      width: 100%;
+      padding: 2px 8px;
+      background: transparent;
+      border-bottom: 1px solid var(--lowest-text-color);
+      color: var(--second-text-color);
+      font-size: 12px;
+      line-height: 18px;
+    }
+
+    :deep(.nut-textarea__textarea) {
+      min-height: 40px;
+      color: inherit;
+      font-size: 12px;
+      line-height: 18px;
+      overflow: hidden;
+      word-break: break-word;
+    }
+  }
+  .compact-textarea-wrapper--custom-dns {
+    width: 100%;
+    max-width: 760px;
+  }
   .compact-input-wrapper--concurrency {
     flex: 0 1 280px;
     max-width: 280px;
   }
+  .custom-dns-input-option {
+    margin-top: 8px;
+  }
+  .tls-skip-cert-option {
+    margin-top: 10px;
+  }
   .custom-dns-input-option,
+  .tls-skip-cert-option,
   .edns-input-option {
     .des-label {
       margin-bottom: 2px;
@@ -344,5 +499,8 @@
       flex: 1;
       min-width: 0;
     }
+  }
+  .rdo-type-option {
+    margin-top: 10px;
   }
 </style>

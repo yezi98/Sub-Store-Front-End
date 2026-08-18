@@ -2,7 +2,7 @@
   <div
     class="sub-item-wrapper"
     :class="{ disabled: props.disabled, 'is-dual-column': props.isDualColumn }"
-    :style="{ padding: itemPadding }"
+    :style="{ padding: itemPadding, '--icon-fit': shareIconFit }"
     data-testid="link-card"
     @click="onClickPreviews"
   >
@@ -130,6 +130,7 @@ import { useSettingsStore } from "@/store/settings";
 import { useSubsStore } from "@/store/subs";
 import { openManagedDeleteDialog } from "@/utils/archive";
 import { createGithubProxyUrlRewriter } from "@/utils/githubProxy";
+import { resolveImageFit } from "@/utils/iconFit";
 import {
   formatShareTimestamp,
   getShareEditPath,
@@ -155,7 +156,7 @@ const isArchiveEnabled = computed(() => {
 const settingsStore = useSettingsStore();
 const subsStore = useSubsStore();
 const { appearanceSetting, githubProxy, githubProxyRegex } = storeToRefs(settingsStore);
-const { currentUrl: host } = useHostAPI();
+const { currentUrl: host, currentShareBaseUrl } = useHostAPI();
 const avatarSize = computed(() => {
   if (appearanceSetting.value.isSimpleMode) return "36";
   return props.isDualColumn ? "40" : "48";
@@ -275,6 +276,9 @@ const shareIcon = computed(() => {
 const isIconColor = computed(() => {
   return shareIconState.value.isIconColor;
 });
+const shareIconFit = computed(() => {
+  return resolveImageFit(shareIconState.value.iconFit, appearanceSetting.value.iconFit);
+});
 
 const onDeleteConfirm = async (mode: DeleteMode = "permanent") => {
   await subsStore.deleteShare(token.value, type.value, name.value, mode);
@@ -372,6 +376,7 @@ const getShareUrl = () => {
     }
     return getSharePublicUrl({
       host: host.value,
+      shareBaseUrl: currentShareBaseUrl.value,
       secretPath: secretPath.value,
       type: props.data.type,
       name: props.data.name,
@@ -398,9 +403,11 @@ const onClickPreviews = () => {
       type: "share",
       url,
       general: t("subPage.panel.general"),
-      notify: t("subPage.copyNotify.succeed"),
+      notify: t("subPage.copyNotify.succeedWithShare"),
       includeUnsupportedProxyLabel: t("subPage.panel.options.includeUnsupportedProxy"),
       prettyYamlLabel: t("subPage.panel.options.prettyYaml"),
+      noFlowLabel: t("subPage.panel.options.noFlow"),
+      displayPreviewInWebPageLabel: t("moreSettingPage.displayPreviewInWebPage"),
       tipsTitle: t("subPage.panel.tips.title"),
       tipsContent: `${t("subPage.panel.tips.content")}\n${t(
         "syncPage.addArtForm.includeUnsupportedProxy.tips.content",
@@ -453,7 +460,7 @@ const onClickPreviews = () => {
     border-radius: 12px;
 
     img {
-      object-fit: contain;
+      object-fit: var(--icon-fit, cover);
       border-radius: 10px;
     }
   }

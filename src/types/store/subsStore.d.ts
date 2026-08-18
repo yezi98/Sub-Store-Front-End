@@ -39,8 +39,10 @@ interface Sub {
   source: 'remote' | 'local';
   icon?: string;
   isIconColor?: boolean;
+  iconFit?: ImageFit | null;
   ua?: string;
   mergeSources?: string;
+  noFlow?: boolean;
   subUserinfo?: string;
   tag?: string[];
   'age-public-key'?: string;
@@ -55,10 +57,12 @@ interface Collection {
   subscriptions: string[];
   subscriptionTags?: string[];
   firstSubFlow?: boolean;
+  noFlow?: boolean;
   subUserinfo?: string;
   proxy?: string;
   icon?: string;
   isIconColor?: boolean;
+  iconFit?: ImageFit | null;
   tag?: string[];
   'age-public-key'?: string;
 }
@@ -101,6 +105,7 @@ interface Share {
   tag?: string[];
   icon?: string | null;
   isIconColor?: boolean | null;
+  iconFit?: ImageFit | null;
   token?: string | null;
   'age-public-key'?: string | null;
   mode?: 'duration' | 'datetime' | 'count' | null;
@@ -122,6 +127,7 @@ interface SharePayload {
   tag?: string[];
   icon?: string | null;
   isIconColor?: boolean | null;
+  iconFit?: ImageFit | null;
   token?: string | null;
   'age-public-key'?: string | null;
 }
