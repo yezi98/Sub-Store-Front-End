@@ -1,0 +1,159 @@
+name: Sync upstream and deploy Cloudflare Pages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "20 20 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync upstream master
+        id: sync
+        run: |
+          set -e
+          git remote add upstream https://github.com/sub-store-org/Sub-Store-Front-End.git || true
+          git fetch upstream master
+
+          BEFORE=$(git rev-parse HEAD)
+
+          # --- 尝试合并；package.json / pnpm-lock.yaml 的冲突自动取上游版本 ---
+          # 实测两边 package.json 只差 version 号（fork 无自定义），lockfile 同理，
+          # 这类冲突取 upstream 就是正确解，不处理会卡死后续所有同步。
+          set +e
+          git merge --no-edit --no-commit upstream/master
+          MERGE_RC=$?
+          set -e
+
+          if [ "$MERGE_RC" -ne 0 ]; then
+            CONFLICTS=$(git diff --name-only --diff-filter=U)
+            if [ -n "$CONFLICTS" ]; then
+              AUTO_RESOLVED=1
+              for f in $CONFLICTS; do
+                case "$f" in
+                  package.json|pnpm-lock.yaml)
+                    echo "Auto-resolving conflict in $f (take upstream)"
+                    git checkout upstream/master -- "$f" && git add "$f"
+                    ;;
+                  *)
+                    AUTO_RESOLVED=0
+                    ;;
+                esac
+              done
+              if [ "$AUTO_RESOLVED" -eq 1 ]; then
+                echo "All conflicts auto-resolved, continuing merge (commit happens below)"
+              else
+                echo "::error::Unresolvable merge conflicts: $CONFLICTS — manual fix required."
+                git merge --abort || true
+                echo "changed=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            else
+              # merge 失败但没有冲突文件（罕见），保守中止
+              git merge --abort || true
+              echo "::error::git merge failed with rc=$MERGE_RC but no conflict files."
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          # --- 丢弃上游对 .github 的一切改动（含新增文件），保留自己的 workflow ---
+          # 原写法 git checkout HEAD -- .github 只能还原已跟踪文件，上游"新增"的文件
+          # 仍会被提交，导致默认 GITHUB_TOKEN 无权 push 而使整个 run 失败。
+          git checkout HEAD -- .github 2>/dev/null || true
+          git clean -fd .github 2>/dev/null || true
+
+          git commit --no-edit || true
+          AFTER=$(git rev-parse HEAD)
+
+          echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
+          echo "after=$AFTER" >> "$GITHUB_OUTPUT"
+
+          if [ "$BEFORE" = "$AFTER" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git push origin master
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Show synced commit
+        run: |
+          echo "Current commit: $(git rev-parse HEAD)"
+          echo "Upstream commit: $(git rev-parse upstream/master)"
+
+      # ====================== 只有 changed=true 时才执行 ======================
+      - name: Set up Node.js
+        if: steps.sync.outputs.changed == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".node-version"
+
+      - name: Set up pnpm
+        if: steps.sync.outputs.changed == 'true'
+        uses: pnpm/action-setup@v6.1.0
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          corepack enable || true
+          # ⚠️ 不要用 `pnpm config set registry`：那会写进全局 ~/.npmrc，污染同一个 job 里
+          #    后续所有 pnpm 调用。改成只对本次 install 生效的方式。
+          pnpm install --no-frozen-lockfile --registry https://registry.npmmirror.com
+
+      - name: Build
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_PUBLIC_PATH: /
+        run: pnpm build
+
+      - name: Add Cloudflare Pages cache headers
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          cat > dist/_headers <<'EOF'
+          /*
+            Cache-Control: no-cache
+          EOF
+
+      - name: Deploy to Cloudflare Pages (with retry)
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_PAGES_PROJECT: ${{ secrets.CLOUDFLARE_PAGES_PROJECT_NAME }}
+        run: |
+          # 固定 wrangler 版本：不再每次查 latest / 动态安装，消除 registry 抖动带来的偶发失败
+          for attempt in 1 2 3; do
+            echo "::group::Deploy attempt $attempt"
+            if npx --yes wrangler@4.40.0 pages deploy dist \
+                 --project-name="$CF_PAGES_PROJECT" \
+                 --branch=master; then
+              echo "::endgroup::"
+              echo "Deploy succeeded on attempt $attempt"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::Deploy attempt $attempt failed, will retry in 20s"
+            sleep 20
+          done
+          echo "::error::All 3 deploy attempts failed"
+          exit 1
